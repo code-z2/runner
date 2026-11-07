@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "RunnerPacePilot",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v26)],
     products: [
         .library(name: "RunnerPacePilot", targets: ["RunnerPacePilot"])
     ],

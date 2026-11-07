@@ -32,3 +32,19 @@ Living record of what was built. Update on every completed item.
   without swift-java plumbing
 - Importance: ground all later package steps stand on
 - Metadata: packages/Runner*, apps/ios, apps/api, tools/git-hooks/pre-push; 2026-11-07
+
+## 2026-11-07 — Step-2 RunnerLocation
+
+- Item: RunnerLocation package (ORDER §2, F02 location half)
+- What it is: LocationTracker actor, LocationUpdateSource protocol with live
+  (CLLocationUpdate.liveUpdates fitness + CLServiceSession whenInUse) and mock
+  sources, pure event mapper, sample model with unknown-on-invalid
+- How it was done: research-first (Apple docs, SDK headers, HIG), TDD with
+  Swift Testing (14 tests, red then green), local skills test-driven-development
+  + write-swift auditing
+- Why this way: handler-based source keeps retention sound; mapper pure for
+  testability; pace math stays in RunnerSession
+- Importance: first audited foundation box; sets the package pattern
+- Metadata: packages/RunnerLocation, iOS 26 + macOS 15 platforms; 2026-11-07
+  (platform bump applied to all packages + app target; Testing/Tests targets
+  land per package with its build step)
