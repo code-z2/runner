@@ -64,3 +64,17 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerCadence; 2026-11-07
 - Gaps: live sensor path not executable on Mac (iOS-only APIs, no hardware);
   verified by header conformance, compiles under availability gate
+
+## 2026-11-07 — Step-4 RunnerSession
+
+- Item: RunnerSession package (ORDER §1, F01 state machine + clock)
+- What it is: WorkoutSession actor, monotonic-segment elapsed clock, atomic
+  JSON snapshots on transitions plus explicit checkpoint, static crash-cut
+  recovery, finish reasons, battery levels at start and end
+- How it was done: research-first (Apple docs, papaSteps spec), TDD with
+  Swift Testing (18 tests, red then green), local skills auditing
+- Why this way: accumulated segments immune to sleep and clock shifts;
+  recovery cuts at last snapshot, never estimates; idempotent finish
+- Importance: the session all other boxes orbit; telemetry packages plug in next
+- Metadata: packages/RunnerSession; 2026-11-07
+- Open: checkpoint cadence + launch-time recovery wiring belong to app layer
