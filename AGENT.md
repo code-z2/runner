@@ -15,6 +15,12 @@ No item counts as done without this entry.
 Default to `bun` for JS/TS work (`bun install`, `bun run <script>`,
 `bunx <bin>`). No `npm`/`npx` unless bun cannot do the job.
 
+## Skills precedence
+
+Prefer repo-local skills first (`.agents/skills/`, `.claude/skills/`),
+then global/user-scope skills. A repo skill covering the task wins over
+an outside equivalent; reach outside only for what no local skill covers.
+
 ## Format before push
 
 Run `swift format` before every push; pushes are

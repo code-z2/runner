@@ -64,3 +64,4 @@ fastlane/test_output
 
 .claude
 .agents
+.DS_Store

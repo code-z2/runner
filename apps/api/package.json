@@ -1,0 +1,9 @@
+{
+  "name": "runner-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "start": "bun src/index.ts"
+  }
+}
