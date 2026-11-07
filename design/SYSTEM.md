@@ -48,3 +48,19 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerLocation, iOS 26 + macOS 15 platforms; 2026-11-07
   (platform bump applied to all packages + app target; Testing/Tests targets
   land per package with its build step)
+
+## 2026-11-07 — Step-3 RunnerCadence
+
+- Item: RunnerCadence package (ORDER §3, F03)
+- What it is: CadenceTracker actor, CadenceUpdateSource protocol with live
+  CMPedometer source and mock, pure event mapper, sample model with
+  nil-on-missing, pure start-policy truth table
+- How it was done: research-first (Apple docs, SDK headers, running-app
+  sources), TDD with Swift Testing (11 tests, red then green), local skills
+  test-driven-development + write-swift auditing
+- Why this way: handler shape matches the SDK; mapper and policy pure for
+  testability; single shared pedometer; pause-gap backfill owned by session
+- Importance: telemetry half complete; session step consumes both streams
+- Metadata: packages/RunnerCadence; 2026-11-07
+- Gaps: live sensor path not executable on Mac (iOS-only APIs, no hardware);
+  verified by header conformance, compiles under availability gate
