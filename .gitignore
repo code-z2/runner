@@ -65,3 +65,9 @@ fastlane/test_output
 .claude
 .agents
 .DS_Store
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+*.db
+__pycache__/
