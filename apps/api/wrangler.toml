@@ -1,3 +1,20 @@
 name = "runner-api"
 main = "src/index.ts"
 compatibility_date = "2026-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "runner-api"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+APP_ID = ""
+APP_ATTEST_ENV = "production"
+NEAR_RPC_URL = "https://rpc.mainnet.near.org"
+NEAR_RECIPIENT = "runner-api"
+TREASURY_CONTRACT = ""
+PORTAL_ORIGIN = ""
+MAIL_FROM = ""

@@ -154,3 +154,17 @@ Assumption: simple single-spend allowance per activity. No daily budgets.
 - Lock screen: ActivityKit during an actual activity only.
 - Retention: most data on device + Keychain. Apple Intelligence by default for AI; mostly on-device execution.
 - Merchant settlement dashboard: nil, not needed. Receipts: nil, onchain transactions are enough.
+
+## 12. Backend API (AGREED)
+
+Assumption: Peter handed the lead and all open decisions to Joel on 2026-11-08. Full contract in `design/API.md`.
+
+- Server jobs: sign claim passes for finished runs, keep the merchant list, merchant sign-up and admin approval. Nothing else.
+- Claim pass: the attestor's signature is the second signature of the 2-of-N. No server call at the merchant.
+- Faked-run guard: no overlap with, and at least 4 hours after, the last attested run, per NEAR account and per device.
+- Oldest run that can be attested: 6 hours after it ended.
+- Steps required for a claim pass.
+- Amount: runner types it after scanning the merchant's fixed QR.
+- Merchant sign-in: email link via Resend.
+- Admin approval holds no DAO key: the DAO proposal passes first, the server checks the contract, then shows the merchant.
+- Stack: Cloudflare Workers + D1, TypeScript, bun.
