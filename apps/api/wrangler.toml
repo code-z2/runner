@@ -14,7 +14,7 @@ crons = ["0 * * * *"]
 
 [vars]
 APP_ID = ""
-APP_ATTEST_ENV = "production"
+APP_ATTEST_ENV = "development"
 NEAR_RPC_URL = "https://rpc.testnet.near.org"
 NEAR_RECIPIENT = "runner-api"
 TREASURY_CONTRACT = ""
