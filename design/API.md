@@ -170,3 +170,32 @@ An hourly job deletes rows past their time.
 | `MAIL_FROM` | var | Sender address for sign-in links |
 | `ATTESTOR_SECRET_KEY` | secret | Ed25519 seed, 32 bytes, base64 |
 | `RESEND_API_KEY` | secret | Resend key |
+
+## Treasury contract (`contracts/treasury`)
+
+NEAR contract, near-sdk 5.30.1. Built in the `sourcescan/cargo-near:0.22.0-rust-1.99.1` image.
+
+Setup: `new(owner_id, token_id, attestor_public_key, units_per_cent)`.
+
+- `owner_id`: the Sputnik DAO account.
+- `token_id`: the stablecoin the pool holds. For USDC (6 decimals), `units_per_cent` is `10000`.
+- `attestor_public_key`: `ed25519:<base58>` of the server's `ATTESTOR_SECRET_KEY`.
+
+Runner call:
+
+- `claim(attestation, signature, merchant_id, amount_cents)`. Sent by the runner's own account, so the runner's key is the first signature and the attestor's is the second. Checks the attestor signature, version, caller, expiry, registered merchant, amount, and single use. Then it sends the tokens to the merchant. If the transfer fails, the pass is freed so the runner can retry before it expires.
+
+Owner calls (through DAO proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_owner`, `pause`, `unpause`, `recover(amount)`.
+
+- `recover` only works while paused and only sends to the owner. There is no other way to move funds out.
+- There is no upgrade method.
+
+Views: `is_merchant(account_id)`, `is_nonce_used(nonce)`, `get_config()`.
+
+Donations: send the configured token with `ft_transfer_call`. Any other token is refunded.
+
+Before go-live:
+
+- The contract account must be registered with the token contract (`storage_deposit`).
+- Each merchant must also be registered with the token contract before `add_merchant`. If not, transfers to them fail and the pass is freed.
+- The contract needs a NEAR balance for storage. Each used pass keeps a 32-byte record.
