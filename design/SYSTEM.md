@@ -191,5 +191,27 @@ Living record of what was built. Update on every completed item.
 - Importance: first live backend the iOS app can call
 - Metadata: apps/api/wrangler.toml, apps/api/scripts/rotate-attestor.ts; 2026-11-08
 - Gaps: APP_ID (Apple Team ID), TREASURY_CONTRACT, PORTAL_ORIGIN, MAIL_FROM and
-  the RESEND_API_KEY secret are unset; iOS AppEnvironment still points at
-  api.runner.app, which is not on this Cloudflare account
+  the RESEND_API_KEY secret are unset
+  (staging/beta/prod now point at this worker via ce2c60a)
+
+## 2026-11-08 - Step RunnerGateway
+
+- Item: RunnerGateway package (ORDER §12 client half + Joel's device-proof path)
+- What it is: typed gateway to apps/api — challenge, device registration,
+  claim-pass request with nested attestation decode, merchant discovery by
+  geohash cell. Injectable HTTPTransport seam; live URLSession transport plus
+  scripted mock in RunnerGatewayTesting. Typed GatewayError with server
+  status + machine-readable code envelope.
+- How it was done: research-first (API.md contract + routes/runner.ts as the
+  wire truth), TDD with Swift Testing (9 tests, red then green), local skills
+  test-driven-development + write-swift + api-and-interface-design auditing
+- Why this way: gateway owns URL + codec only; App Attest bytes and NEAR
+  signatures arrive as strings from the platform/wallet layers, so key
+  material never crosses this box. Matches the server's snake_case wire
+  exactly, including the nested attestation JSON string.
+- Importance: the missing client Joel's iPhone proof needs; unblocks device
+  registration + 2.5 km claim-pass run once APP_ID is set
+- Metadata: packages/RunnerGateway (+Testing), iOS 26 + macOS 15; 2026-11-08
+- Gaps: live calls unverified (APP_ID still unset server-side); no app-layer
+  wiring yet — App Attest generation, NEP-413 signing, Keychain storage land
+  with RunnerAuth + app target
