@@ -149,7 +149,7 @@ Same sign-in. The admin flag is set by hand in the database.
 |---|---|---|
 | challenges | id, expires_at | 5 minutes |
 | devices | key_id, public_key, counter, created_at | while in use |
-| attested_activities | activity_hash, account_id, key_id, started_at, ended_at, created_at | 24 hours |
+| attested_activities | activity_hash, account_id, key_id, started_at, ended_at, created_at | 3 days after the run ended |
 | merchants | id, email, is_admin, created_at | while in use |
 | login_tokens | token_hash, email, expires_at, created_at | 15 minutes |
 | sessions | token_hash, merchant_id, expires_at | 30 days |

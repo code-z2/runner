@@ -127,3 +127,30 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerEncounters; 2026-11-07
 - Gaps: live BLE needs two real radios (compile-verified only); BT permission
   + background modes land with app target
+
+## 2026-11-08 - Backend API decisions + runner-api worker
+
+- Item: ORDER §12 backend API (attestor, merchant registry, merchant portal API)
+- What it is: Cloudflare Worker + D1 in apps/api. Runner routes: challenge,
+  App Attest device registration, claim pass (attestation) for a finished
+  run, merchant discovery by geohash cell. Portal routes: email sign-in,
+  merchant locations, admin review. Hourly cleanup job.
+- How it was done: the 5 open questions in design/API.md settled (Peter handed
+  the lead to Joel); pure parts split out (eligibility, geohash, NEP-413,
+  claim pass signing); 42 bun tests over an in-memory SQLite stand-in for D1;
+  tsc strict; wrangler dry-run bundle (~680 KiB)
+- Why this way: the attestor's ed25519 signature over the exact pass bytes is
+  the 2-of-N co-sign, so the server is not on the claim path; no DAO key on
+  the server, admin approval only reads the contract; overlap + 4 hour gap
+  per account and per device is checked and written in one statement
+- Importance: unblocks item 7 (merchants) and item 8 (treasury claim) once the
+  contract exists
+- Metadata: apps/api, design/API.md, design/ORDER.md §12; deps @noble/curves,
+  @noble/hashes, @scure/base, cbor-x, @peculiar/x509, reflect-metadata;
+  2026-11-08
+- Gaps: App Attest key registration is only tested against bad input; needs
+  one real device run. Assertion check assumes the signature is ECDSA-SHA256
+  over SHA256(authData || SHA256(payload)); confirm on device. Treasury
+  contract (is_merchant, claim) not built yet. D1 database, vars and secrets
+  (ATTESTOR_SECRET_KEY, RESEND_API_KEY) not created yet. Merchant portal web
+  app not built yet.
