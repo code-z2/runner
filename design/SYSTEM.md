@@ -111,3 +111,19 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerHealthKit; 2026-11-07
 - Gaps: live path not executable on Mac; entitlements + usage strings land
   with app target
+
+## 2026-11-07 — Step-7 RunnerEncounters
+
+- Item: RunnerEncounters package (ORDER §5, BLE encounters)
+- What it is: pure ledger (first/repeat/dwell, 30-day prune), pure RSSI
+  grader with cooldown, rotating identifier, tracker actor with session pump,
+  live CoreBluetooth dual-role pair with state restoration, system haptics
+- How it was done: research-first (BLE vs UWB vs Wi-Fi Aware vs MPC
+  full-sack review; BLE only viable transport), TDD with Swift Testing
+  (16 tests, red then green), local + swift-concurrency-expert auditing
+- Why this way: identity-free background packets, OS-peripheral-ID dedup,
+  rotation-proof windows; pump drains before stop clears state (test-caught)
+- Importance: passive social core done; hardware smoke tests queued post-packages
+- Metadata: packages/RunnerEncounters; 2026-11-07
+- Gaps: live BLE needs two real radios (compile-verified only); BT permission
+  + background modes land with app target
