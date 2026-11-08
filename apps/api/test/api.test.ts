@@ -279,9 +279,12 @@ describe("merchant and admin flow", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe("https://portal.runner.test");
   });
 
-  test("refuses to run when settings are missing", async () => {
-    const response = await call(createEnv({ ATTESTOR_SECRET_KEY: "" }), "POST", "/v1/challenge");
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "misconfigured" });
+  test("each feature needs only its own settings", async () => {
+    const partial = createEnv({ ATTESTOR_SECRET_KEY: "", RESEND_API_KEY: "" });
+    expect((await call(partial, "POST", "/v1/challenge")).status).toBe(201);
+    expect((await call(partial, "GET", "/v1/merchants?cells=s14eu")).status).toBe(200);
+    const login = await call(partial, "POST", "/v1/merchant/login", { email: "shop@example.com" });
+    expect(login.status).toBe(503);
+    expect(await login.json()).toEqual({ error: "misconfigured" });
   });
 });

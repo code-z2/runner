@@ -1,4 +1,4 @@
-import { missingSettings, nowSeconds, type Env } from "./env";
+import { nowSeconds, type Env } from "./env";
 import { HttpError, json } from "./http";
 import { listLocations, reviewLocation } from "./routes/admin";
 import {
@@ -60,13 +60,8 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
 export async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const portalRoute = url.pathname.startsWith("/v1/merchant/") || url.pathname.startsWith("/v1/admin/");
-  const extraHeaders = portalRoute ? corsHeaders(env) : {};
+  const extraHeaders = portalRoute && env.PORTAL_ORIGIN ? corsHeaders(env) : {};
 
-  const missing = missingSettings(env);
-  if (missing.length > 0) {
-    console.error(`runner-api missing settings: ${missing.join(", ")}`);
-    return json({ error: "misconfigured" }, 500);
-  }
   if (portalRoute && request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: extraHeaders });
   }
