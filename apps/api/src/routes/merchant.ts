@@ -1,5 +1,5 @@
 import { hashHex, randomToken, utf8 } from "../codec";
-import { nowSeconds, type Env } from "../env";
+import { nowSeconds, requireSettings, type Env } from "../env";
 import { geohash } from "../geohash";
 import { HttpError, json, numberField, readJson, stringField, trimmedField, type Json } from "../http";
 import { sendSignInLink } from "../mail";
@@ -51,6 +51,7 @@ export function presentLocation(row: LocationRow): Json {
 const tokenHash = (token: string): string => hashHex(utf8(token));
 
 export async function requestLogin(request: Request, env: Env): Promise<Response> {
+  requireSettings(env, ["PORTAL_ORIGIN", "MAIL_FROM", "RESEND_API_KEY"]);
   const body = await readJson(request);
   const email = trimmedField(body, "email", 254).toLowerCase();
   if (!EMAIL.test(email)) {
