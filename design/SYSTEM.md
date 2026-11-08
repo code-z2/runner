@@ -155,6 +155,27 @@ Living record of what was built. Update on every completed item.
   (ATTESTOR_SECRET_KEY, RESEND_API_KEY) not created yet. Merchant portal web
   app not built yet.
 
+## 2026-11-08 - Treasury contract
+
+- Item: ORDER §8 treasury claim policy (C05/T01-T10)
+- What it is: NEAR contract in contracts/treasury. Holds one stablecoin,
+  pays registered merchants against an attestor-signed claim pass sent by the
+  runner's own account (2-of-N), one use per pass, failed transfers free the
+  pass. DAO owner manages merchants, attestor key, pause and recovery.
+- How it was done: near-sdk 5.30.1; 18 unit tests with near-sdk unit-testing
+  and ed25519-dalek signing real passes; built with cargo near in the pinned
+  sourcescan/cargo-near:0.22.0-rust-1.99.1 image (digest in Cargo.toml),
+  wasm 161,282 bytes, sha256 108bf492...a438f513
+- Why this way: verifying the exact pass bytes the server signs keeps the
+  server off the claim path; the pass is marked used before the transfer so
+  two claims cannot race; recovery only to the DAO and only while paused, and
+  no upgrade method, so no admin path pays an unknown account
+- Importance: closes the money path for items 7 and 8 end to end, apart from
+  deployment
+- Metadata: contracts/treasury, design/API.md; 2026-11-08
+- Gaps: not deployed; needs testnet run with a real token and Sputnik DAO
+  proposal for add_merchant; no integration test against a live sandbox yet
+
 ## 2026-11-08 - runner-api deployed (test)
 
 - Item: Cloudflare setup for runner-api
