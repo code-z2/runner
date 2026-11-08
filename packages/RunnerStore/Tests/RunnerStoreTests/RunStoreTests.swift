@@ -1,0 +1,105 @@
+//
+//  RunStoreTests.swift
+//  RunnerStoreTests
+//
+//  Created by Peter on 07/11/2026.
+//
+
+import Foundation
+import RunnerSession
+import RunnerStoreTesting
+import Testing
+
+@testable import RunnerStore
+
+struct RunStoreTests {
+
+  private func finishedRun(
+    id: UUID = UUID(),
+    startedAt: Date = Date(timeIntervalSince1970: 1_000),
+    elapsed: TimeInterval = 60,
+    distanceMeters: Double? = 2_000
+  ) -> (FinishedRunModel, Double?) {
+    let run = FinishedRunModel(
+      id: id,
+      startedAtWall: startedAt,
+      activeElapsed: elapsed,
+      finishedAtWall: Date(timeIntervalSince1970: 1_000 + elapsed),
+      finishReason: .userFinished,
+      batteryLevelAtStart: 0.9,
+      batteryLevelAtEnd: 0.8
+    )
+    return (run, distanceMeters)
+  }
+
+  @Test
+  func recordPersistsAndReturnsSnapshot() async throws {
+    let store = try TestStoreFactory.makeStore()
+    let (run, distance) = finishedRun(elapsed: 90, distanceMeters: 3_000)
+
+    let snapshot = try await store.record(run, distanceMeters: distance)
+
+    #expect(snapshot.id == run.id)
+    #expect(snapshot.activeElapsed == 90)
+    #expect(snapshot.distanceMeters == 3_000)
+    #expect(snapshot.finishReason == String(describing: FinishReason.userFinished))
+  }
+
+  @Test
+  func recordingSameRunTwiceReturnsOneRecord() async throws {
+    let store = try TestStoreFactory.makeStore()
+    let (run, distance) = finishedRun()
+
+    let first = try await store.record(run, distanceMeters: distance)
+    let second = try await store.record(run, distanceMeters: distance)
+
+    #expect(first == second)
+    #expect(try await store.recentRuns(limit: 10).count == 1)
+  }
+
+  @Test
+  func recentRunsAreNewestFirstAndCapped() async throws {
+    let store = try TestStoreFactory.makeStore()
+    for (index, elapsed) in [30.0, 60.0, 90.0].enumerated() {
+      let startedAt = Date(timeIntervalSince1970: 1_000 + Double(index))
+      let (run, distance) = finishedRun(id: UUID(), startedAt: startedAt, elapsed: elapsed)
+      _ = try await store.record(run, distanceMeters: distance)
+    }
+
+    let recent = try await store.recentRuns(limit: 2)
+
+    #expect(recent.count == 2)
+    #expect(recent[0].activeElapsed == 90)
+    #expect(recent[1].activeElapsed == 60)
+  }
+
+  @Test
+  func personalBestsComputeFromHistory() async throws {
+    let store = try TestStoreFactory.makeStore()
+    let slow = finishedRun(id: UUID(), elapsed: 600, distanceMeters: 2_000)
+    _ = try await store.record(slow.0, distanceMeters: slow.1)
+    let fast = finishedRun(id: UUID(), elapsed: 300, distanceMeters: 2_000)
+    _ = try await store.record(fast.0, distanceMeters: fast.1)
+    let short = finishedRun(id: UUID(), elapsed: 60, distanceMeters: 500)
+    _ = try await store.record(short.0, distanceMeters: short.1)
+
+    let bests = try await store.personalBests()
+
+    #expect(bests.totalRuns == 3)
+    #expect(bests.totalActiveTime == 960)
+    #expect(bests.longest?.activeElapsed == 600)
+    #expect(bests.fastestPaceSecondsPerMeter == 0.15)
+  }
+
+  @Test
+  func emptyStoreHasEmptyBests() async throws {
+    let store = try TestStoreFactory.makeStore()
+
+    let bests = try await store.personalBests()
+
+    #expect(bests.totalRuns == 0)
+    #expect(bests.totalActiveTime == 0)
+    #expect(bests.longest == nil)
+    #expect(bests.fastestPaceSecondsPerMeter == nil)
+  }
+}

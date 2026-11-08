@@ -15,6 +15,14 @@ No item counts as done without this entry.
 Default to `bun` for JS/TS work (`bun install`, `bun run <script>`,
 `bunx <bin>`). No `npm`/`npx` unless bun cannot do the job.
 
+## Swift toolchain
+
+Swift 6 language mode on the newest Xcode toolchain (6.4+;
+`SWIFT_VERSION` stays `6.0` — the compiler accepts nothing newer).
+Packages declare `swift-tools-version: 6.4`.
+iOS 26.0 is the minimum deployment target; always build with the
+latest SDK (27.x).
+
 ## Skills precedence
 
 Prefer repo-local skills first (`.agents/skills/`, `.claude/skills/`),

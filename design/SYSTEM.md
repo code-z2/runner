@@ -78,3 +78,20 @@ Living record of what was built. Update on every completed item.
 - Importance: the session all other boxes orbit; telemetry packages plug in next
 - Metadata: packages/RunnerSession; 2026-11-07
 - Open: checkpoint cadence + launch-time recovery wiring belong to app layer
+
+## 2026-11-07 — Step-5 RunnerStore + toolchain policy
+
+- Item: RunnerStore package (ORDER §11, device history + bests)
+- What it is: RunRecord @Model with V1 schema + migration plan, RunStore
+  @ModelActor with idempotent record, capped recentRuns, on-demand bests;
+  snapshots cross the boundary, never models
+- How it was done: research-first (Apple docs, verified persistence guides),
+  design skills api-and-interface-design + planning-and-task-breakdown
+  consulted (contract-first, idempotency key = run ID, additive schema),
+  TDD with Swift Testing (5 tests, red then green), local skills auditing
+- Why this way: actor executor is the idempotency atomicity; schema history
+  never deleted; container owned by app layer
+- Importance: history + bests box done; HealthKit next
+- Metadata: packages/RunnerStore; 2026-11-07
+- Also: Swift 6.4 policy — swift-tools 6.4 everywhere, SWIFT_VERSION stays
+  6.0 (compiler maximum), iOS 26.0 minimum with latest SDK; recorded in AGENT.md
