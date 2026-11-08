@@ -95,3 +95,19 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerStore; 2026-11-07
 - Also: Swift 6.4 policy — swift-tools 6.4 everywhere, SWIFT_VERSION stays
   6.0 (compiler maximum), iOS 26.0 minimum with latest SDK; recorded in AGENT.md
+
+## 2026-11-07 — Step-6 RunnerHealthKit
+
+- Item: RunnerHealthKit package (ORDER §11, HealthKit boundary)
+- What it is: HealthKitGateway protocol (access, save, HR read, live stream);
+  live store saves via HKWorkoutBuilder with distance sample, reads HR via
+  sample query, live stream honestly unavailable until Watch step
+- How it was done: research-first (Apple docs, SDK headers, running-app
+  patterns), TDD with Swift Testing (5 tests, red then green), local skills
+  auditing; compiler pothole fixed by pinning continuation result type
+- Why this way: passive by design (builder save, no live session) keeps F11;
+  minimal scopes (workout write + HR read); body metrics stay out of HealthKit
+- Importance: phone enrichment done; Watch step plugs the live seam
+- Metadata: packages/RunnerHealthKit; 2026-11-07
+- Gaps: live path not executable on Mac; entitlements + usage strings land
+  with app target
