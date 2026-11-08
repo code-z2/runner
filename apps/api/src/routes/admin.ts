@@ -1,4 +1,4 @@
-import { nowSeconds, type Env } from "../env";
+import { nowSeconds, requireSettings, type Env } from "../env";
 import { HttpError, json } from "../http";
 import { isRegisteredMerchant } from "../near";
 import { LOCATION_COLUMNS, presentLocation, type LocationRow, type Merchant } from "./merchant";
@@ -37,6 +37,9 @@ export async function reviewLocation(
     .first<LocationRow>();
   if (!location) {
     throw new HttpError(404, "location_not_found");
+  }
+  if (decision === "approved") {
+    requireSettings(env, ["NEAR_RPC_URL", "TREASURY_CONTRACT"]);
   }
   if (
     decision === "approved" &&

@@ -49,9 +49,9 @@ nonisolated enum AppEnvironment: String, Sendable {
   var apiBaseURL: String {
     switch self {
     case .dev: return "http://localhost:8787"
-    case .staging: return "https://staging-api.runner.app"
-    case .beta: return "https://beta-api.runner.app"
-    case .prod: return "https://api.runner.app"
+    case .staging: return "https://runner-api.anyaogupeter601.workers.dev"
+    case .beta: return "https://runner-api.anyaogupeter601.workers.dev"
+    case .prod: return "https://runner-api.anyaogupeter601.workers.dev"
     }
   }
 }

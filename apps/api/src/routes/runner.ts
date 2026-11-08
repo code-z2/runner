@@ -2,7 +2,7 @@ import { verifyAssertion, verifyKeyAttestation } from "../appAttest";
 import { attestorSecret, signClaimPass } from "../attestor";
 import { fromBase64, hashHex, randomBytes, toBase64, utf8 } from "../codec";
 import { CLAIM_WINDOW_S, GAP_S, checkEligibility, maxAmountCents, parseActivity } from "../eligibility";
-import { nowSeconds, type Env } from "../env";
+import { nowSeconds, requireSettings, type Env } from "../env";
 import { isCell } from "../geohash";
 import { HttpError, json, parseObject, readJson, stringField } from "../http";
 import { isAccountId, isFullAccessKey, parsePublicKey, verifyNep413 } from "../near";
@@ -30,6 +30,7 @@ async function consumeChallenge(env: Env, challenge: string): Promise<Uint8Array
 }
 
 export async function registerDevice(request: Request, env: Env): Promise<Response> {
+  requireSettings(env, ["APP_ID", "APP_ATTEST_ENV"]);
   const body = await readJson(request);
   const keyId = stringField(body, "key_id", 64);
   const attestation = fromBase64(stringField(body, "attestation", 12000), "invalid_attestation");
@@ -77,6 +78,7 @@ async function checkDevice(env: Env, keyId: string, assertion: Uint8Array, paylo
 }
 
 export async function createAttestation(request: Request, env: Env): Promise<Response> {
+  requireSettings(env, ["APP_ID", "NEAR_RPC_URL", "NEAR_RECIPIENT", "ATTESTOR_SECRET_KEY"]);
   const body = await readJson(request);
   const payload = stringField(body, "payload", 8192);
   const keyId = stringField(body, "key_id", 64);

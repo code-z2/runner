@@ -1,10 +1,12 @@
 name = "runner-api"
 main = "src/index.ts"
 compatibility_date = "2026-11-01"
+account_id = "f1e022c6d9e3a80eeb1bd8b7e4b28385"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "runner-api"
+database_id = "62403d0b-151e-480d-8775-f1be4a325256"
 migrations_dir = "migrations"
 
 [triggers]
@@ -12,8 +14,8 @@ crons = ["0 * * * *"]
 
 [vars]
 APP_ID = ""
-APP_ATTEST_ENV = "production"
-NEAR_RPC_URL = "https://rpc.mainnet.near.org"
+APP_ATTEST_ENV = "development"
+NEAR_RPC_URL = "https://rpc.testnet.near.org"
 NEAR_RECIPIENT = "runner-api"
 TREASURY_CONTRACT = ""
 PORTAL_ORIGIN = ""

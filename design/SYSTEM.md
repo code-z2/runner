@@ -175,3 +175,21 @@ Living record of what was built. Update on every completed item.
 - Metadata: contracts/treasury, design/API.md; 2026-11-08
 - Gaps: not deployed; needs testnet run with a real token and Sputnik DAO
   proposal for add_merchant; no integration test against a live sandbox yet
+
+## 2026-11-08 - runner-api deployed (test)
+
+- Item: Cloudflare setup for runner-api
+- What it is: worker live at https://runner-api.anyaogupeter601.workers.dev,
+  D1 runner-api (62403d0b-151e-480d-8775-f1be4a325256, WEUR) with schema,
+  hourly cleanup cron, ATTESTOR_SECRET_KEY stored as a secret. Attestor
+  public key: ed25519:5nkc2NppUmiqBDaZYKjsgXigejTzmNzXeRzY336BXcUb
+- How it was done: wrangler 4.158.0 on account f1e022c6d9e3a80eeb1bd8b7e4b28385;
+  key made by `bun run rotate-attestor`, secret never printed; settings now
+  checked per feature (503 misconfigured) so challenge and discovery work
+  while others are unset; live smoke test of challenge, discovery, login, 404
+- Why this way: test app on NEAR testnet and App Attest development mode
+- Importance: first live backend the iOS app can call
+- Metadata: apps/api/wrangler.toml, apps/api/scripts/rotate-attestor.ts; 2026-11-08
+- Gaps: APP_ID (Apple Team ID), TREASURY_CONTRACT, PORTAL_ORIGIN, MAIL_FROM and
+  the RESEND_API_KEY secret are unset; iOS AppEnvironment still points at
+  api.runner.app, which is not on this Cloudflare account

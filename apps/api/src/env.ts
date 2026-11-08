@@ -1,3 +1,5 @@
+import { HttpError } from "./http";
+
 export interface Env {
   DB: D1Database;
   APP_ID: string;
@@ -11,24 +13,17 @@ export interface Env {
   RESEND_API_KEY: string;
 }
 
-const REQUIRED: (keyof Omit<Env, "DB">)[] = [
-  "APP_ID",
-  "APP_ATTEST_ENV",
-  "NEAR_RPC_URL",
-  "NEAR_RECIPIENT",
-  "TREASURY_CONTRACT",
-  "PORTAL_ORIGIN",
-  "MAIL_FROM",
-  "ATTESTOR_SECRET_KEY",
-  "RESEND_API_KEY",
-];
+export type Setting = keyof Omit<Env, "DB">;
 
-export function missingSettings(env: Env): string[] {
-  const missing: string[] = REQUIRED.filter((name) => !env[name]);
-  if (env.APP_ATTEST_ENV && env.APP_ATTEST_ENV !== "production" && env.APP_ATTEST_ENV !== "development") {
+export function requireSettings(env: Env, names: Setting[]): void {
+  const missing = names.filter((name) => !env[name]);
+  if (names.includes("APP_ATTEST_ENV") && env.APP_ATTEST_ENV && !["production", "development"].includes(env.APP_ATTEST_ENV)) {
     missing.push("APP_ATTEST_ENV");
   }
-  return missing;
+  if (missing.length > 0) {
+    console.error(`runner-api missing settings: ${missing.join(", ")}`);
+    throw new HttpError(503, "misconfigured");
+  }
 }
 
 export const nowSeconds = (): number => Math.floor(Date.now() / 1000);
