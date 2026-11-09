@@ -392,3 +392,16 @@ Living record of what was built. Update on every completed item.
 - Gaps: not deployed; run proofs only exist for runs that pass the claim rules
   (2.5 km+, steps, 4 hour gap), so a second run within 4 hours cannot unlock a
   goal yet
+
+## 2026-11-09 - Ije logo
+
+- Item: app name and logo
+- What it is: name Ije (Igbo for journey), agreed with Peter. Lowercase "ije"
+  wordmark in even rounded strokes; the dots over i and j are two runners
+  passing, the j dot in gold. Files in design/brand: app icon (SVG, PNG 1024
+  and 512, ivory on ink #1C1813), wordmark dark and light (SVG and PNG)
+- How it was done: hand-built SVG geometry, rendered to PNG with headless Chrome
+- Why this way: simple vector mark that stays sharp at any size and matches the
+  ivory, ink and gold palette in the Figma file
+- Importance: needed now for the NEAR auth production access application
+- Metadata: design/brand; 2026-11-09
