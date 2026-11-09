@@ -64,3 +64,17 @@ Define success criteria. Loop until verified. Don't tell Claude what steps to fo
 3. One op per command. Verify between steps (`ls` after each move).
 4. Prefer non-destructive forms: `cp` + verify + `rm`, or `mv -n` (no-clobber).
 5. Never chain two dependent moves in a single command.
+
+## Client patterns (vaariance/wades-app)
+
+Source of truth: `vaariance/wades-app`, branch `dev`, `apps/ios/Wades`. Every iOS change follows these.
+
+- Composition root: one `AppModel` builds the long-lived services once (gateway, storage, auth, integrity, toast, feedback) and hands them down by init injection. No god-object view model. No singletons except what App Intents needs (`AppDependencyManager`).
+- Root routing: an `@Observable RootNavigation` holds a `RootRoute` enum. Feature shells use `SubNavigation<Edge, Destination>`: at most one edge underlay plus a typed push `path`. `open(_:)` is the only programmatic entry; dismiss through bindings or `path`, never a second close API.
+- View model graph: `AppViewModels` creates each feature view model lazily and wires its callbacks there, never in `RootView.body`.
+- Feature layout: `Features/<Name>/{Model, Store, Service, ViewModel, View/{Pages, Rows, Sections}}`. Cross-feature pieces live in `Shared/<Area>`.
+- View models: `@Observable final class` conforming to `AppViewModelType` (`ModelWithStore`, `ModelWithLifecycle`). They hold account-wide data and operations only, as `private(set)` state. Each screen owns its own interaction state as `@State`. Dependencies are optional with defaults so previews build. Feedback goes through `any Feedback` (`NoFeedback` default) and toasts through `ToastController`.
+- Async freshness: a `@ObservationIgnored` generation counter so an older response never overwrites a newer one. Failed reads keep the last known data.
+- Stores: `nonisolated` `Sendable` structs over `any Storage` drawers (`DurableStore` Keychain, `DefaultsStore`, `CacheStore`, `DiskStore`). Computed properties with `nonmutating set`. Keys live in a `private enum Key`, prefixed with the domain (`"names.primary"`). Local data renders before network reads land.
+- Packages hold platform-neutral logic; the app target holds SwiftUI and wiring only.
+- Views use design tokens (`Theme.Spacing`, `Theme.Colors`) and a text-style modifier, never raw sizes or colors.
