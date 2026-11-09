@@ -1,0 +1,29 @@
+[package]
+name = "runner_near_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+name = "runner_near_core"
+
+[dependencies]
+uniffi = { version = "=0.32.2", features = ["cli"] }
+sha2 = "0.10"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+base64 = "0.22"
+hex = "0.4"
+bs58 = "0.5"
+near-api = "0.8.7"
+reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
+serde_json = "1"
+borsh = "1"
+thiserror = "1"
+
+[dev-dependencies]
+hex = "0.4"
+
+[profile.release]
+strip = true
+lto = true

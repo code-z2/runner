@@ -215,3 +215,64 @@ Living record of what was built. Update on every completed item.
 - Gaps: live calls unverified (APP_ID still unset server-side); no app-layer
   wiring yet — App Attest generation, NEP-413 signing, Keychain storage land
   with RunnerAuth + app target
+
+## 2026-11-09 - Step RunnerNear (holy grail package)
+
+- Item: RunnerNear package — passkey-only NEAR client + provider, Rust core via UniFFI
+- What it is: single Swift box for all NEAR needs. `runner-near-core` (Rust:
+  NEP-413 digest, ed25519, implicit accounts today; near-api RPC + MPC signer
+  next) exposed through UniFFI as a checked-in 29 MB XCFramework with
+  generated bindings isolated in `RunnerNearCore`. Swift owns passkey login
+  (`Auth0PasskeyProvider`: PKCE authorize, code exchange, refresh, logout),
+  MPC signing (`FastAuthSigner`: NEP-413 via core + relayer request), session
+  and account models. No social login, no JS toolchain in the binary.
+- How it was done: research-first (Peersyst `providers/javascript` +
+  `sdks/browser` + `@shared/core` read; JS tree audited and rejected for
+  shipping — same 7 deps in both packages, no platform fit). Rust toolchain
+  installed (1.99.1 + iOS targets), crate TDD'd with `cargo test` (5 tests:
+  server-minted NEP-413 vector, RFC 8032, round-trips), then Swift Testing
+  (17 tests: 6 live-core vectors, 7 provider state machine, 4 signer shape).
+  Testnet values baked from docs (shared Auth0 client, contract IDs).
+- Why this way: Swift does login + orchestration, Rust owns every chain
+  byte; byte-exact NEP-413 with `apps/api` proven both sides of the wire.
+  Passkey-only scoping collapses the port to one login path + three
+  signature methods. Generated code never mixes with hand code.
+- Importance: the `RunnerAuth` base — app-layer auth builds off this box only
+- Metadata: packages/RunnerNear (rust/, Sources/RunnerNearCore|RunnerNear|
+  RunnerNearTesting, Frameworks/RunnerNearCoreFFI.xcframework 29 MB,
+  rust/build-xcframework.sh); uniffi 0.32.2; iOS 26 + macOS 15; 2026-11-09
+- Gaps: near-api RPC + MPC `SignerTrait` + live relayer/account-resolver
+  implementations need testnet proof (relayer URL + response shape unverified
+  — mocked); passkey sheet presentation + Keychain land with app layer;
+  binary size to re-measure when near-api lands
+
+## 2026-11-09 - Step RunnerNear RPC + MPC pipeline
+
+- Item: near-api RPC, tx builders, MPC derivation + signature ceremony
+- What it is: Rust core gains `NearRpc` (blocking JSON-RPC: latest block,
+  access keys, view calls, broadcast), unsigned tx builders (transfer +
+  function call, V0 Borsh), hash/attach with wrong-key rejection, and
+  `mpc_public_key` view helper. Swift gains the ceremony: per-signature
+  Auth0 round trip with payload param, `fatxn` assertion fail-closed,
+  `guard_id` corrected to `jwt#https://<domain>/`, resolver
+  (`path → derived key → implicit account`), `SignSubmitter` seam.
+- How it was done: protocol docs read first (contracts, how-it-works,
+  sign-transactions, relayer); live testnet probes before baking anything
+  (`derived_public_key` needs explicit predecessor + `domain_id: 1` for
+  Ed25519 — verified, not assumed). Rust `cargo test`: 10 offline + 3 live
+  `#[ignore]` (latest block, stable Ed25519 derivation, unknown-key error).
+  Swift: 26 tests, 5 suites, green. Fixed along the way: modulemap
+  `framework module` → `module`, legacy bindgen backend dropped for
+  `uniffi-bindgen-swift`, SystemConfiguration/Security linker settings,
+  deployment-target env for Rust builds.
+- Why this way: no tokio crosses the FFI (blocking reqwest); near-api
+  supplies chain types only, so encoding bugs are upstream's. The `sign`
+  call submission stays behind `SignSubmitter` — production is a controlled
+  relayer, testnet proof runs through the core with a dev key in scratch.
+- Importance: everything short of the interactive JWT is proven against
+  live testnet; the ceremony's first real login is now a device step
+- Metadata: packages/RunnerNear; XCFramework 65 MB (near-api aboard —
+  watching); uniffi 0.32.2; iOS 26 + macOS 15; 2026-11-09
+- Gaps: interactive passkey login + `sign` submission + account
+  funding/key-permission proof need a device (JWT-gated, can't run
+  headless); production submitter (server relayer) is a later step
