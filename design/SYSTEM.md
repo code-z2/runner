@@ -296,3 +296,22 @@ Living record of what was built. Update on every completed item.
 - Metadata: Inter stands in for SF Pro in Figma (SF Pro is not installed on the
   Windows design machine); the app should use the system font; headings use
   Instrument Serif (OFL); 2026-11-09
+
+## 2026-11-09 - Goal escrow contract + run proofs
+
+- Item: ORDER §10 and §13 goal escrow (G01-G05)
+- What it is: NEAR contract in contracts/escrow. Runners lock their own token
+  on a distance or distance-and-time goal; a server-signed run proof that beats
+  it unlocks into an escrow balance they can withdraw or lock again; give up
+  sends half to the treasury. runner-api now returns run_proof with each pass.
+- How it was done: near-sdk 5.30.1, 18 unit tests with real ed25519 proofs;
+  cargo near build in the pinned image, wasm 198,631 bytes, sha256
+  0e8c0771...3b5c8132; server test for the proof shape and signature (43 pass)
+- Why this way: one attestor key, kept apart by shape (deny_unknown_fields +
+  kind) so a claim pass can never unlock a goal; no pause or admin withdraw so
+  runners always control unlocked money; failed pool transfers are retryable
+- Importance: last money path in the spec
+- Metadata: contracts/escrow, apps/api/src/attestor.ts, design/API.md; 2026-11-09
+- Gaps: not deployed; run proofs only exist for runs that pass the claim rules
+  (2.5 km+, steps, 4 hour gap), so a second run within 4 hours cannot unlock a
+  goal yet
