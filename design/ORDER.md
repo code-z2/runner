@@ -156,6 +156,14 @@ Assumption: simple single-spend allowance per activity. No daily budgets.
 - Full audio engine beyond item 6 hooks (item 6 owns live-coach behavior; this owns engine depth).
 - Run analysis: data-driven algorithm over run history producing reports. Not clinical. Form inference deferred entirely, no video analysis.
 
+## 10a. Escrow package (AGREED 2026-11-09)
+
+- Token: USDC only. Amounts are base-unit strings end to end; no floats cross the seam.
+- Attestor: the same backend key that signs treasury claim passes. The run proof arrives in the same server response (`run_proof` + `run_proof_signature`); the app forwards both into `unlock` and never verifies locally — the contract is the source of truth.
+- Submission: the relayer submits every state-changing call (`ft_transfer_call` lock, `unlock`, `give_up`, `withdraw`, `lock_from_balance`) because only a full-access key can attach the 1-yocto deposit. The relayer endpoint shape is Joel's; the package carries the submitter as a seam with a mock, no invented HTTP.
+- Slice: package only — typed models, `EscrowFunctions` seam, live RPC views, relayer submitter seam, mocks, Swift mirrors of the contract tests. Goals UI, audio engine, run reports stay later.
+- Deploy values (escrow/treasury/token accounts, `min_lock`) land from Joel's deployment; until then the package's placeholders are syntactically valid but nonexistent accounts, so every call fails closed at RPC.
+
 ## 11. Platform defaults (AGREED)
 
 - History: device only. Bests: device only.
