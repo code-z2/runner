@@ -13,6 +13,9 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (en);
 			mainGroup = 100000000000000000000002;
+			packageReferences = (
+				100000000000000000000040,
+			);
 			productRefGroup = 100000000000000000000006;
 			projectDirPath = "";
 			projectRoot = "";
@@ -42,6 +45,7 @@
 				100000000000000000000015,
 				100000000000000000000016,
 				100000000000000000000017,
+				100000000000000000000043,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -74,6 +78,9 @@
 			buildRules = ();
 			dependencies = ();
 			name = Runner;
+			packageProductDependencies = (
+				100000000000000000000041,
+			);
 			productName = Runner;
 			productReference = 100000000000000000000008;
 			productType = "com.apple.product-type.application";
@@ -92,13 +99,16 @@
 				100000000000000000000012,
 				100000000000000000000013,
 				100000000000000000000014,
+				100000000000000000000044,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		100000000000000000000010 = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				100000000000000000000042,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		100000000000000000000011 = {
@@ -106,6 +116,29 @@
 			buildActionMask = 2147483647;
 			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000040 = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../packages/RunnerNear;
+		};
+		100000000000000000000041 = {
+			isa = XCSwiftPackageProductDependency;
+			package = 100000000000000000000040;
+			productName = RunnerNear;
+		};
+		100000000000000000000042 = {
+			isa = PBXBuildFile;
+			productRef = 100000000000000000000041;
+		};
+		100000000000000000000043 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ProofHarness.swift;
+			sourceTree = "<group>";
+		};
+		100000000000000000000044 = {
+			isa = PBXBuildFile;
+			fileRef = 100000000000000000000043;
 		};
 		100000000000000000000012 = {
 			isa = PBXBuildFile;

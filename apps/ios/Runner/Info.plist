@@ -22,6 +22,15 @@
 	<true/>
 	<key>RunnerEnvironment</key>
 	<string>$(RUNNER_ENV)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>runner</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
