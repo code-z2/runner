@@ -277,6 +277,83 @@ Living record of what was built. Update on every completed item.
   funding/key-permission proof need a device (JWT-gated, can't run
   headless); production submitter (server relayer) is a later step
 
+## 2026-11-09 - Step RunnerNear simulator ceremony proof
+
+- Item: interactive passkey login + signing JWT, proven live on the booted
+  iPhone 18 Pro sim (DEBUG harness, out of git)
+- What it is: two-phase login → signing consent over a 1-yocto
+  self-transfer, `fatxn verified` on an RS256 JWT, derived implicit account
+  `81bff4edb4f1d84629218de49a42aaa003730a0e599bed0d26cdf3c41ed2f383`
+  with key `ed25519:9jVMuq…`; live RPC confirms the key absent
+  (`unknown_access_key` @ block 276938107 — unfunded, as expected
+  pre-faucet)
+- How it was done: tenant Auth0 Action read line-by-line; four contract
+  corrections fell out — payload as comma-joined bytes (not base64), no
+  `audience` on plain login, signing JWT arrives as `access_token` (no
+  `id_token`), `fatxn` is a bare number array. Temporary localhost-capture
+  hack until the `applinks` universal-link callback lands. Swift suite 31
+  tests, green
+- Importance: closes the RPC + MPC pipeline's last gap — the ceremony's
+  first real login is done, on live testnet
+- Metadata: apps/ios/Runner proof harness (DEBUG-only, out of git);
+  2026-11-09
+- Gaps: faucet-fund the derived account, MPC `sign` + broadcast the dust
+  tx, production relayer submitter
+
+## 2026-11-09 - Step RunnerNear 1Click intents rail
+
+- Item: cross-chain entry/exit for escrow + treasury without new cryptography
+- What it is: `intents.rs` in the Rust core — blocking 1Click client over
+  official `one-click-sdk-rs` contract types (pinned rev `f9741c3`): token
+  list, dry/wet quotes, deposit notices, status polls with `X-API-Key`.
+  Swift gains `IntentFunctions` seam, `LiveIntentClient`, `MockIntentClient`.
+- How it was done: SDK endpoint fns never attach partner auth (verified in
+  source), so transport stays in our blocking client — no tokio crosses the
+  FFI. Stringly enums fail closed (`EXACT_INPUT`, `ORIGIN_CHAIN`, …).
+  Rust: 6 offline tests against a local mock server (auth-header presence,
+  dry-no-address, submit→status round trip, 401 mapping). Swift: 4
+  `IntentTests` (dry→wet→submit→SUCCESS, terminal FAILED, unscripted
+  fail-closed). Suites: 16 Rust + 35 Swift, green.
+- Why this way: deposits stay plain transfers (MPC-signed, already built);
+  INTENTS-balance swaps are one NEP-413 signature (already built). No new
+  signature machinery — solvers do the rest. Confidential swaps deferred:
+  unlinkability fights the attestation model; one flag away when wanted.
+- Importance: the money-movement half of item 9; escrow funding and
+  withdrawals ride this rail
+- Metadata: packages/RunnerNear (rust/intents.rs, IntentFunctions,
+  LiveIntentClient, MockIntentClient, IntentTests); XCFramework 67 MB;
+  2026-11-09
+- Gaps: live mainnet proof needs small-amount swaps (no intents testnet);
+  1Click API key provisioning; NEP-413 intent signing needs mainnet tenant
+  confirmation
+
+## 2026-11-09 - Step RunnerAuth (identity box)
+
+- Item: ORDER 9a — Apple + NEAR identities, Keychain session, coordinator
+- What it is: `RunnerAuth` depends on `RunnerNear` (first package→package
+  link). `AppleAuth` (nonce, identity-token parse/validate, no UI),
+  `SecureStore` seam + `KeychainStore` (device-only, no sync, silent) +
+  `MemoryStore` mock, `RunnerAuthCoordinator` actor (Apple-first ordered
+  linking, single `runner.account.v1` blob, NEAR optional per F11).
+  NearLink carries stored credential only — expiry/refresh stay with
+  RunnerNear’s provider, nothing poses as a fresh session.
+- How it was done: research-first (SDK headers ground truth, sosumi.ai for
+  HIG + Callback docs, Auth0.swift as reference-not-dependency).
+  Presentation stays app-layer; deprecated `callbackURLScheme` init never
+  enters the package. TDD Swift Testing: 11 tests, 3 suites, green —
+  incl. a live Keychain round trip with per-run service + cleanup.
+  Concurrency: async store seam (sync witnesses satisfy, actor mock
+  conforms) per swift-concurrency-expert.
+- Why this way: chain signing programs against RunnerNear’s `NearSigner`;
+  the day-3 local-key fallback lands as a `LocalKeySigner` with no
+  app-layer changes. No Auth0.swift dependency — auditable boxes only.
+- Importance: the identity half of item 9; app container builds on this
+- Metadata: packages/RunnerAuth (RunnerAuth, RunnerAuthTesting); first
+  inter-package dependency (`../RunnerNear`); iOS 26 + macOS 15; 2026-11-09
+- Gaps: `credentialState` launch check + controller presentation live in
+  the app layer; server SIWA verification is Joel’s side; biometric gate
+  deferred (silent Keychain unless asked)
+
 ## 2026-11-09 - iOS UI design (Figma)
 
 - Item: zero-functionality UI for the iOS app
@@ -299,7 +376,7 @@ Living record of what was built. Update on every completed item.
 
 ## 2026-11-09 - Goal escrow contract + run proofs
 
-- Item: ORDER �10 and �13 goal escrow (G01-G05)
+- Item: ORDER §10 and §13 goal escrow (G01-G05)
 - What it is: NEAR contract in contracts/escrow. Runners lock their own token
   on a distance or distance-and-time goal; a server-signed run proof that beats
   it unlocks into an escrow balance they can withdraw or lock again; give up
@@ -315,16 +392,3 @@ Living record of what was built. Update on every completed item.
 - Gaps: not deployed; run proofs only exist for runs that pass the claim rules
   (2.5 km+, steps, 4 hour gap), so a second run within 4 hours cannot unlock a
   goal yet
-- 2026-11-09 simulator ceremony proof (iPhone 18 Pro sim, DEBUG harness):
-  two-phase passkey login → signing JWT over a 1-yocto self-transfer,
-  `fatxn verified`, derived implicit account
-  `81bff4edb4f1d84629218de49a42aaa003730a0e599bed0d26cdf3c41ed2f383`
-  with key `ed25519:9jVMuq…`; live RPC confirms the key absent
-  (`unknown_access_key` @ block 276938107 — unfunded, as expected
-  pre-faucet). Tenant contract corrections that fell out: payload as
-  comma-joined bytes (not base64), no `audience` on plain login, signing
-  JWT arrives as `access_token` (no `id_token`), `fatxn` is a bare number
-  array. Swift suite now 31 tests. Proof harness lives on disk only
-  (out of git, DEBUG-only) with a localhost-capture hack until `runner://`
-  is allowlisted. Still open: faucet-fund the derived account, MPC `sign`
-  + broadcast the dust tx, production relayer submitter
