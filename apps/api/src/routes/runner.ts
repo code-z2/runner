@@ -1,5 +1,5 @@
 import { verifyAssertion, verifyKeyAttestation } from "../appAttest";
-import { attestorSecret, signClaimPass } from "../attestor";
+import { attestorSecret, signClaimPass, signRunProof } from "../attestor";
 import { fromBase64, hashHex, randomBytes, toBase64, utf8 } from "../codec";
 import { CLAIM_WINDOW_S, GAP_S, checkEligibility, maxAmountCents, parseActivity } from "../eligibility";
 import { nowSeconds, requireSettings, type Env } from "../env";
@@ -127,6 +127,7 @@ export async function createAttestation(request: Request, env: Env): Promise<Res
     throw new HttpError(409, "too_soon");
   }
 
+  const secret = attestorSecret(env.ATTESTOR_SECRET_KEY);
   const pass = signClaimPass(
     {
       accountId,
@@ -134,9 +135,20 @@ export async function createAttestation(request: Request, env: Env): Promise<Res
       maxAmountCents: maxAmountCents(activity.distanceM),
       expiresAt: now + CLAIM_WINDOW_S,
     },
-    attestorSecret(env.ATTESTOR_SECRET_KEY),
+    secret,
   );
-  return json(pass, 201);
+  const run = signRunProof(
+    {
+      accountId,
+      activityHash,
+      startedAt: activity.startedAt,
+      endedAt: activity.endedAt,
+      distanceM: activity.distanceM,
+      activeSeconds: activity.activeSeconds,
+    },
+    secret,
+  );
+  return json({ ...pass, run_proof: run.attestation, run_proof_signature: run.signature }, 201);
 }
 
 export async function listMerchants(url: URL, env: Env): Promise<Response> {

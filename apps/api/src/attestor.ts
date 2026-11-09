@@ -27,6 +27,29 @@ export function attestorSecret(encoded: string): Uint8Array {
   return secret;
 }
 
+export interface RunProof {
+  accountId: string;
+  activityHash: string;
+  startedAt: number;
+  endedAt: number;
+  distanceM: number;
+  activeSeconds: number;
+}
+
+export function signRunProof(run: RunProof, secret: Uint8Array): SignedClaimPass {
+  const proof = JSON.stringify({
+    v: 1,
+    kind: "run",
+    account_id: run.accountId,
+    activity_hash: run.activityHash,
+    started_at: run.startedAt,
+    ended_at: run.endedAt,
+    distance_m: run.distanceM,
+    active_seconds: run.activeSeconds,
+  });
+  return { attestation: proof, signature: toBase64(ed25519.sign(utf8(proof), secret)) };
+}
+
 export function signClaimPass(pass: ClaimPass, secret: Uint8Array): SignedClaimPass {
   const attestation = JSON.stringify({
     v: 1,
