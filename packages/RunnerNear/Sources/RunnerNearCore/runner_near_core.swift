@@ -8,44 +8,46 @@ import Foundation
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
 #if canImport(runner_near_coreFFI)
-import runner_near_coreFFI
+  import runner_near_coreFFI
 #endif
 
-fileprivate extension RustBuffer {
-    // Allocate a new buffer, copying the contents of a `UInt8` array.
-    init(bytes: [UInt8]) {
-        let rbuf = bytes.withUnsafeBufferPointer { ptr in
-            RustBuffer.from(ptr)
-        }
-        self.init(capacity: rbuf.capacity, len: rbuf.len, data: rbuf.data)
+extension RustBuffer {
+  // Allocate a new buffer, copying the contents of a `UInt8` array.
+  fileprivate init(bytes: [UInt8]) {
+    let rbuf = bytes.withUnsafeBufferPointer { ptr in
+      RustBuffer.from(ptr)
     }
+    self.init(capacity: rbuf.capacity, len: rbuf.len, data: rbuf.data)
+  }
 
-    static func empty() -> RustBuffer {
-        RustBuffer(capacity: 0, len:0, data: nil)
-    }
+  fileprivate static func empty() -> RustBuffer {
+    RustBuffer(capacity: 0, len: 0, data: nil)
+  }
 
-    static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_runner_near_core_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+  fileprivate static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
+    try! rustCall {
+      ffi_runner_near_core_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0)
     }
+  }
 
-    // Frees the buffer in place.
-    // The buffer must not be used after this is called.
-    func deallocate() {
-        try! rustCall { ffi_runner_near_core_rustbuffer_free(self, $0) }
-    }
+  // Frees the buffer in place.
+  // The buffer must not be used after this is called.
+  fileprivate func deallocate() {
+    try! rustCall { ffi_runner_near_core_rustbuffer_free(self, $0) }
+  }
 }
 
-fileprivate extension ForeignBytes {
-    init(bufferPointer: UnsafeBufferPointer<UInt8>) {
-        self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
-    }
+extension ForeignBytes {
+  fileprivate init(bufferPointer: UnsafeBufferPointer<UInt8>) {
+    self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
+  }
 
-    init(rawBufferPointer: UnsafeRawBufferPointer) {
-        self.init(
-            len: Int32(rawBufferPointer.count),
-            data: rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-        )
-    }
+  fileprivate init(rawBufferPointer: UnsafeRawBufferPointer) {
+    self.init(
+      len: Int32(rawBufferPointer.count),
+      data: rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+    )
+  }
 }
 
 // Converter for `&[u8]` / `[ByRef] bytes` arguments.
@@ -60,31 +62,37 @@ fileprivate extension ForeignBytes {
 // pointer is only guaranteed valid for the duration of
 // `Data.withUnsafeBytes`. Callers must run the full FFI call inside
 // the closure body.
-fileprivate enum FfiConverterByRefBytes: FfiConverter {
-    typealias SwiftType = Data
-    typealias FfiType = ForeignBytes
+private enum FfiConverterByRefBytes: FfiConverter {
+  typealias SwiftType = Data
+  typealias FfiType = ForeignBytes
 
-    static func lower<R>(_ value: Data, _ body: (ForeignBytes) throws -> R) rethrows -> R {
-        return try value.withUnsafeBytes { rawBuf in
-            try body(ForeignBytes(rawBufferPointer: rawBuf))
-        }
+  static func lower<R>(_ value: Data, _ body: (ForeignBytes) throws -> R) rethrows -> R {
+    return try value.withUnsafeBytes { rawBuf in
+      try body(ForeignBytes(rawBufferPointer: rawBuf))
     }
+  }
 
-    static func lower(_ value: Data) -> ForeignBytes {
-        fatalError("ByRef bytes cannot use the plain lower: returning ForeignBytes escapes the Data.withUnsafeBytes scope. Use the scope-bound lower(_:_body:) overload instead.")
-    }
+  static func lower(_ value: Data) -> ForeignBytes {
+    fatalError(
+      "ByRef bytes cannot use the plain lower: returning ForeignBytes escapes the Data.withUnsafeBytes scope. Use the scope-bound lower(_:_body:) overload instead."
+    )
+  }
 
-    static func lift(_ value: ForeignBytes) throws -> Data {
-        fatalError("ByRef bytes cannot be lifted: zero-copy &[u8] only flows foreign->Rust")
-    }
+  static func lift(_ value: ForeignBytes) throws -> Data {
+    fatalError("ByRef bytes cannot be lifted: zero-copy &[u8] only flows foreign->Rust")
+  }
 
-    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
-        fatalError("ByRef bytes cannot be read from a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
-    }
+  static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+    fatalError(
+      "ByRef bytes cannot be read from a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc."
+    )
+  }
 
-    static func write(_ value: Data, into buf: inout [UInt8]) {
-        fatalError("ByRef bytes cannot be written to a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
-    }
+  static func write(_ value: Data, into buf: inout [UInt8]) {
+    fatalError(
+      "ByRef bytes cannot be written to a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc."
+    )
+  }
 }
 
 // For every type used in the interface, we provide helper methods for conveniently
@@ -94,14 +102,14 @@ fileprivate enum FfiConverterByRefBytes: FfiConverter {
 // Helper classes/extensions that don't change.
 // Someday, this will be in a library of its own.
 
-fileprivate extension Data {
-    init(rustBuffer: RustBuffer) {
-        self.init(
-            bytesNoCopy: rustBuffer.data!,
-            count: Int(rustBuffer.len),
-            deallocator: .none
-        )
-    }
+extension Data {
+  fileprivate init(rustBuffer: RustBuffer) {
+    self.init(
+      bytesNoCopy: rustBuffer.data!,
+      count: Int(rustBuffer.len),
+      deallocator: .none
+    )
+  }
 }
 
 // Define reader functionality.  Normally this would be defined in a class or
@@ -118,1044 +126,1596 @@ fileprivate extension Data {
 //
 // Instead, the read() method and these helper functions input a tuple of data
 
-fileprivate func createReader(data: Data) -> (data: Data, offset: Data.Index) {
-    (data: data, offset: 0)
+private func createReader(data: Data) -> (data: Data, offset: Data.Index) {
+  (data: data, offset: 0)
 }
 
 // Reads an integer at the current offset, in big-endian order, and advances
 // the offset on success. Throws if reading the integer would move the
 // offset past the end of the buffer.
-fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
-    let range = reader.offset..<reader.offset + MemoryLayout<T>.size
-    guard reader.data.count >= range.upperBound else {
-        throw UniffiInternalError.bufferOverflow
-    }
-    if T.self == UInt8.self {
-        let value = reader.data[reader.offset]
-        reader.offset += 1
-        return value as! T
-    }
-    var value: T = 0
-    let _ = withUnsafeMutableBytes(of: &value, { reader.data.copyBytes(to: $0, from: range)})
-    reader.offset = range.upperBound
-    return value.bigEndian
+private func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws
+  -> T
+{
+  let range = reader.offset..<reader.offset + MemoryLayout<T>.size
+  guard reader.data.count >= range.upperBound else {
+    throw UniffiInternalError.bufferOverflow
+  }
+  if T.self == UInt8.self {
+    let value = reader.data[reader.offset]
+    reader.offset += 1
+    return value as! T
+  }
+  var value: T = 0
+  let _ = withUnsafeMutableBytes(of: &value, { reader.data.copyBytes(to: $0, from: range) })
+  reader.offset = range.upperBound
+  return value.bigEndian
 }
 
 // Reads an arbitrary number of bytes, to be used to read
 // raw bytes, this is useful when lifting strings
-fileprivate func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> Array<UInt8> {
-    let range = reader.offset..<(reader.offset+count)
-    guard reader.data.count >= range.upperBound else {
-        throw UniffiInternalError.bufferOverflow
-    }
-    var value = [UInt8](repeating: 0, count: count)
-    value.withUnsafeMutableBufferPointer({ buffer in
-        reader.data.copyBytes(to: buffer, from: range)
-    })
-    reader.offset = range.upperBound
-    return value
+private func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws
+  -> [UInt8]
+{
+  let range = reader.offset..<(reader.offset + count)
+  guard reader.data.count >= range.upperBound else {
+    throw UniffiInternalError.bufferOverflow
+  }
+  var value = [UInt8](repeating: 0, count: count)
+  value.withUnsafeMutableBufferPointer({ buffer in
+    reader.data.copyBytes(to: buffer, from: range)
+  })
+  reader.offset = range.upperBound
+  return value
 }
 
 // Reads a float at the current offset.
-fileprivate func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
-    return Float(bitPattern: try readInt(&reader))
+private func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
+  return Float(bitPattern: try readInt(&reader))
 }
 
 // Reads a float at the current offset.
-fileprivate func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
-    return Double(bitPattern: try readInt(&reader))
+private func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
+  return Double(bitPattern: try readInt(&reader))
 }
 
 // Indicates if the offset has reached the end of the buffer.
-fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
-    return reader.offset < reader.data.count
+private func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
+  return reader.offset < reader.data.count
 }
 
 // Define writer functionality.  Normally this would be defined in a class or
 // struct, but we use standalone functions instead in order to make external
 // types work.  See the above discussion on Readers for details.
 
-fileprivate func createWriter() -> [UInt8] {
-    return []
+private func createWriter() -> [UInt8] {
+  return []
 }
 
-fileprivate func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S) where S: Sequence, S.Element == UInt8 {
-    writer.append(contentsOf: byteArr)
+private func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S)
+where S: Sequence, S.Element == UInt8 {
+  writer.append(contentsOf: byteArr)
 }
 
 // Writes an integer in big-endian order.
 //
 // Warning: make sure what you are trying to write
 // is in the correct type!
-fileprivate func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
-    var value = value.bigEndian
-    withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
+private func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
+  var value = value.bigEndian
+  withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
 }
 
-fileprivate func writeFloat(_ writer: inout [UInt8], _ value: Float) {
-    writeInt(&writer, value.bitPattern)
+private func writeFloat(_ writer: inout [UInt8], _ value: Float) {
+  writeInt(&writer, value.bitPattern)
 }
 
-fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
-    writeInt(&writer, value.bitPattern)
+private func writeDouble(_ writer: inout [UInt8], _ value: Double) {
+  writeInt(&writer, value.bitPattern)
 }
 
 // Protocol for types that transfer other types across the FFI. This is
 // analogous to the Rust trait of the same name.
-fileprivate protocol FfiConverter {
-    associatedtype FfiType
-    associatedtype SwiftType
+private protocol FfiConverter {
+  associatedtype FfiType
+  associatedtype SwiftType
 
-    static func lift(_ value: FfiType) throws -> SwiftType
-    static func lower(_ value: SwiftType) -> FfiType
-    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType
-    static func write(_ value: SwiftType, into buf: inout [UInt8])
+  static func lift(_ value: FfiType) throws -> SwiftType
+  static func lower(_ value: SwiftType) -> FfiType
+  static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType
+  static func write(_ value: SwiftType, into buf: inout [UInt8])
 }
 
 // Types conforming to `Primitive` pass themselves directly over the FFI.
-fileprivate protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType { }
+private protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType {}
 
 extension FfiConverterPrimitive {
-#if swift(>=5.8)
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public static func lift(_ value: FfiType) throws -> SwiftType {
-        return value
-    }
+  #endif
+  public static func lift(_ value: FfiType) throws -> SwiftType {
+    return value
+  }
 
-#if swift(>=5.8)
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public static func lower(_ value: SwiftType) -> FfiType {
-        return value
-    }
+  #endif
+  public static func lower(_ value: SwiftType) -> FfiType {
+    return value
+  }
 }
 
 // Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
 // Used for complex types where it's hard to write a custom lift/lower.
-fileprivate protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
+private protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
-#if swift(>=5.8)
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public static func lift(_ buf: RustBuffer) throws -> SwiftType {
-        var reader = createReader(data: Data(rustBuffer: buf))
-        let value = try read(from: &reader)
-        if hasRemaining(reader) {
-            throw UniffiInternalError.incompleteData
-        }
-        buf.deallocate()
-        return value
+  #endif
+  public static func lift(_ buf: RustBuffer) throws -> SwiftType {
+    var reader = createReader(data: Data(rustBuffer: buf))
+    let value = try read(from: &reader)
+    if hasRemaining(reader) {
+      throw UniffiInternalError.incompleteData
     }
+    buf.deallocate()
+    return value
+  }
 
-#if swift(>=5.8)
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public static func lower(_ value: SwiftType) -> RustBuffer {
-          var writer = createWriter()
-          write(value, into: &writer)
-          return RustBuffer(bytes: writer)
-    }
+  #endif
+  public static func lower(_ value: SwiftType) -> RustBuffer {
+    var writer = createWriter()
+    write(value, into: &writer)
+    return RustBuffer(bytes: writer)
+  }
 }
 // An error type for FFI errors. These errors occur at the UniFFI level, not
 // the library level.
-fileprivate enum UniffiInternalError: LocalizedError {
-    case bufferOverflow
-    case incompleteData
-    case unexpectedOptionalTag
-    case unexpectedEnumCase
-    case unexpectedNullPointer
-    case unexpectedRustCallStatusCode
-    case unexpectedRustCallError
-    case unexpectedStaleHandle
-    case rustPanic(_ message: String)
+private enum UniffiInternalError: LocalizedError {
+  case bufferOverflow
+  case incompleteData
+  case unexpectedOptionalTag
+  case unexpectedEnumCase
+  case unexpectedNullPointer
+  case unexpectedRustCallStatusCode
+  case unexpectedRustCallError
+  case unexpectedStaleHandle
+  case rustPanic(_ message: String)
 
-    public var errorDescription: String? {
-        switch self {
-        case .bufferOverflow: return "Reading the requested value would read past the end of the buffer"
-        case .incompleteData: return "The buffer still has data after lifting its containing value"
-        case .unexpectedOptionalTag: return "Unexpected optional tag; should be 0 or 1"
-        case .unexpectedEnumCase: return "Raw enum value doesn't match any cases"
-        case .unexpectedNullPointer: return "Raw pointer value was null"
-        case .unexpectedRustCallStatusCode: return "Unexpected RustCallStatus code"
-        case .unexpectedRustCallError: return "CALL_ERROR but no errorClass specified"
-        case .unexpectedStaleHandle: return "The object in the handle map has been dropped already"
-        case let .rustPanic(message): return message
-        }
+  public var errorDescription: String? {
+    switch self {
+    case .bufferOverflow: return "Reading the requested value would read past the end of the buffer"
+    case .incompleteData: return "The buffer still has data after lifting its containing value"
+    case .unexpectedOptionalTag: return "Unexpected optional tag; should be 0 or 1"
+    case .unexpectedEnumCase: return "Raw enum value doesn't match any cases"
+    case .unexpectedNullPointer: return "Raw pointer value was null"
+    case .unexpectedRustCallStatusCode: return "Unexpected RustCallStatus code"
+    case .unexpectedRustCallError: return "CALL_ERROR but no errorClass specified"
+    case .unexpectedStaleHandle: return "The object in the handle map has been dropped already"
+    case .rustPanic(let message): return message
     }
+  }
 }
 
-fileprivate extension NSLock {
-    func withLock<T>(f: () throws -> T) rethrows -> T {
-        self.lock()
-        defer { self.unlock() }
-        return try f()
-    }
+extension NSLock {
+  fileprivate func withLock<T>(f: () throws -> T) rethrows -> T {
+    self.lock()
+    defer { self.unlock() }
+    return try f()
+  }
 }
 
-fileprivate let CALL_SUCCESS: Int8 = 0
-fileprivate let CALL_ERROR: Int8 = 1
-fileprivate let CALL_UNEXPECTED_ERROR: Int8 = 2
-fileprivate let CALL_CANCELLED: Int8 = 3
+private let CALL_SUCCESS: Int8 = 0
+private let CALL_ERROR: Int8 = 1
+private let CALL_UNEXPECTED_ERROR: Int8 = 2
+private let CALL_CANCELLED: Int8 = 3
 
-fileprivate extension RustCallStatus {
-    init() {
-        self.init(
-            code: CALL_SUCCESS,
-            errorBuf: RustBuffer.init(
-                capacity: 0,
-                len: 0,
-                data: nil
-            )
-        )
-    }
+extension RustCallStatus {
+  fileprivate init() {
+    self.init(
+      code: CALL_SUCCESS,
+      errorBuf: RustBuffer.init(
+        capacity: 0,
+        len: 0,
+        data: nil
+      )
+    )
+  }
 }
 
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    let neverThrow: ((RustBuffer) throws -> Never)? = nil
-    return try makeRustCall(callback, errorHandler: neverThrow)
+  let neverThrow: ((RustBuffer) throws -> Never)? = nil
+  return try makeRustCall(callback, errorHandler: neverThrow)
 }
 
 private func rustCallWithError<T, E: Swift.Error>(
-    _ errorHandler: @escaping (RustBuffer) throws -> E,
-    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    try makeRustCall(callback, errorHandler: errorHandler)
+  _ errorHandler: @escaping (RustBuffer) throws -> E,
+  _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T
+) throws -> T {
+  try makeRustCall(callback, errorHandler: errorHandler)
 }
 
 private func makeRustCall<T, E: Swift.Error>(
-    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
-    errorHandler: ((RustBuffer) throws -> E)?
+  _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
+  errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
-    uniffiEnsureRunnerNearCoreInitialized()
-    var callStatus = RustCallStatus.init()
-    let returnedVal = callback(&callStatus)
-    try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
-    return returnedVal
+  uniffiEnsureRunnerNearCoreInitialized()
+  var callStatus = RustCallStatus.init()
+  let returnedVal = callback(&callStatus)
+  try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
+  return returnedVal
 }
 
 private func uniffiCheckCallStatus<E: Swift.Error>(
-    callStatus: RustCallStatus,
-    errorHandler: ((RustBuffer) throws -> E)?
+  callStatus: RustCallStatus,
+  errorHandler: ((RustBuffer) throws -> E)?
 ) throws {
-    switch callStatus.code {
-        case CALL_SUCCESS:
-            return
+  switch callStatus.code {
+  case CALL_SUCCESS:
+    return
 
-        case CALL_ERROR:
-            if let errorHandler = errorHandler {
-                throw try errorHandler(callStatus.errorBuf)
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.unexpectedRustCallError
-            }
-
-        case CALL_UNEXPECTED_ERROR:
-            // When the rust code sees a panic, it tries to construct a RustBuffer
-            // with the message.  But if that code panics, then it just sends back
-            // an empty buffer.
-            if callStatus.errorBuf.len > 0 {
-                throw UniffiInternalError.rustPanic(try FfiConverterString.lift(callStatus.errorBuf))
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.rustPanic("Rust panic")
-            }
-
-        case CALL_CANCELLED:
-            fatalError("Cancellation not supported yet")
-
-        default:
-            throw UniffiInternalError.unexpectedRustCallStatusCode
+  case CALL_ERROR:
+    if let errorHandler = errorHandler {
+      throw try errorHandler(callStatus.errorBuf)
+    } else {
+      callStatus.errorBuf.deallocate()
+      throw UniffiInternalError.unexpectedRustCallError
     }
+
+  case CALL_UNEXPECTED_ERROR:
+    // When the rust code sees a panic, it tries to construct a RustBuffer
+    // with the message.  But if that code panics, then it just sends back
+    // an empty buffer.
+    if callStatus.errorBuf.len > 0 {
+      throw UniffiInternalError.rustPanic(try FfiConverterString.lift(callStatus.errorBuf))
+    } else {
+      callStatus.errorBuf.deallocate()
+      throw UniffiInternalError.rustPanic("Rust panic")
+    }
+
+  case CALL_CANCELLED:
+    fatalError("Cancellation not supported yet")
+
+  default:
+    throw UniffiInternalError.unexpectedRustCallStatusCode
+  }
 }
 
 private func uniffiTraitInterfaceCall<T>(
-    callStatus: UnsafeMutablePointer<RustCallStatus>,
-    makeCall: () throws -> T,
-    writeReturn: (T) -> ()
+  callStatus: UnsafeMutablePointer<RustCallStatus>,
+  makeCall: () throws -> T,
+  writeReturn: (T) -> Void
 ) {
-    do {
-        try writeReturn(makeCall())
-    } catch let error {
-        callStatus.pointee.code = CALL_UNEXPECTED_ERROR
-        callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
-    }
+  do {
+    try writeReturn(makeCall())
+  } catch let error {
+    callStatus.pointee.code = CALL_UNEXPECTED_ERROR
+    callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
+  }
 }
 
 private func uniffiTraitInterfaceCallWithError<T, E>(
-    callStatus: UnsafeMutablePointer<RustCallStatus>,
-    makeCall: () throws -> T,
-    writeReturn: (T) -> (),
-    lowerError: (E) -> RustBuffer
+  callStatus: UnsafeMutablePointer<RustCallStatus>,
+  makeCall: () throws -> T,
+  writeReturn: (T) -> Void,
+  lowerError: (E) -> RustBuffer
 ) {
-    do {
-        try writeReturn(makeCall())
-    } catch let error as E {
-        callStatus.pointee.code = CALL_ERROR
-        callStatus.pointee.errorBuf = lowerError(error)
-    } catch {
-        callStatus.pointee.code = CALL_UNEXPECTED_ERROR
-        callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
-    }
+  do {
+    try writeReturn(makeCall())
+  } catch let error as E {
+    callStatus.pointee.code = CALL_ERROR
+    callStatus.pointee.errorBuf = lowerError(error)
+  } catch {
+    callStatus.pointee.code = CALL_UNEXPECTED_ERROR
+    callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
+  }
 }
-// Initial value and increment amount for handles. 
+// Initial value and increment amount for handles.
 // These ensure that SWIFT handles always have the lowest bit set
-fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
-fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
+private let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
+private let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
 
-fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
-    // All mutation happens with this lock held, which is why we implement @unchecked Sendable.
-    private let lock = NSLock()
-    private var map: [UInt64: T] = [:]
-    private var currentHandle: UInt64 = UNIFFI_HANDLEMAP_INITIAL
+private final class UniffiHandleMap<T>: @unchecked Sendable {
+  // All mutation happens with this lock held, which is why we implement @unchecked Sendable.
+  private let lock = NSLock()
+  private var map: [UInt64: T] = [:]
+  private var currentHandle: UInt64 = UNIFFI_HANDLEMAP_INITIAL
 
-    func insert(obj: T) -> UInt64 {
-        lock.withLock {
-            return doInsert(obj)
-        }
+  func insert(obj: T) -> UInt64 {
+    lock.withLock {
+      return doInsert(obj)
     }
+  }
 
-    // Low-level insert function, this assumes `lock` is held.
-    private func doInsert(_ obj: T) -> UInt64 {
-        let handle = currentHandle
-        currentHandle += UNIFFI_HANDLEMAP_DELTA
-        map[handle] = obj
-        return handle
-    }
+  // Low-level insert function, this assumes `lock` is held.
+  private func doInsert(_ obj: T) -> UInt64 {
+    let handle = currentHandle
+    currentHandle += UNIFFI_HANDLEMAP_DELTA
+    map[handle] = obj
+    return handle
+  }
 
-     func get(handle: UInt64) throws -> T {
-        try lock.withLock {
-            guard let obj = map[handle] else {
-                throw UniffiInternalError.unexpectedStaleHandle
-            }
-            return obj
-        }
+  func get(handle: UInt64) throws -> T {
+    try lock.withLock {
+      guard let obj = map[handle] else {
+        throw UniffiInternalError.unexpectedStaleHandle
+      }
+      return obj
     }
+  }
 
-     func clone(handle: UInt64) throws -> UInt64 {
-        try lock.withLock {
-            guard let obj = map[handle] else {
-                throw UniffiInternalError.unexpectedStaleHandle
-            }
-            return doInsert(obj)
-        }
+  func clone(handle: UInt64) throws -> UInt64 {
+    try lock.withLock {
+      guard let obj = map[handle] else {
+        throw UniffiInternalError.unexpectedStaleHandle
+      }
+      return doInsert(obj)
     }
+  }
 
-    @discardableResult
-    func remove(handle: UInt64) throws -> T {
-        try lock.withLock {
-            guard let obj = map.removeValue(forKey: handle) else {
-                throw UniffiInternalError.unexpectedStaleHandle
-            }
-            return obj
-        }
+  @discardableResult
+  func remove(handle: UInt64) throws -> T {
+    try lock.withLock {
+      guard let obj = map.removeValue(forKey: handle) else {
+        throw UniffiInternalError.unexpectedStaleHandle
+      }
+      return obj
     }
+  }
 
-    var count: Int {
-        get {
-            map.count
-        }
-    }
+  var count: Int {
+    map.count
+  }
 }
-
 
 // Public interface members begin here.
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
-    typealias FfiType = UInt64
-    typealias SwiftType = UInt64
+private struct FfiConverterUInt32: FfiConverterPrimitive {
+  typealias FfiType = UInt32
+  typealias SwiftType = UInt32
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
-        return try lift(readInt(&buf))
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+    return try lift(readInt(&buf))
+  }
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterBool : FfiConverter {
-    typealias FfiType = Int8
-    typealias SwiftType = Bool
+private struct FfiConverterUInt64: FfiConverterPrimitive {
+  typealias FfiType = UInt64
+  typealias SwiftType = UInt64
 
-    public static func lift(_ value: Int8) throws -> Bool {
-        return value != 0
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+    return try lift(readInt(&buf))
+  }
 
-    public static func lower(_ value: Bool) -> Int8 {
-        return value ? 1 : 0
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
-        return try lift(readInt(&buf))
-    }
-
-    public static func write(_ value: Bool, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterString: FfiConverter {
-    typealias SwiftType = String
-    typealias FfiType = RustBuffer
+private struct FfiConverterDouble: FfiConverterPrimitive {
+  typealias FfiType = Double
+  typealias SwiftType = Double
 
-    public static func lift(_ value: RustBuffer) throws -> String {
-        defer {
-            value.deallocate()
-        }
-        if value.data == nil {
-            return String()
-        }
-        let bytes = UnsafeBufferPointer<UInt8>(start: value.data!, count: Int(value.len))
-        // Use Swift's native UTF-8 decoder; `String(bytes:encoding:.utf8)` goes
-        // through Foundation's NSString and silently strips a leading U+FEFF BOM.
-        // Invalid UTF-8 substitutes U+FFFD instead of trapping (unreachable
-        // given Rust's `String` invariant).
-        return String(decoding: bytes, as: UTF8.self)
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Double {
+    return try lift(readDouble(&buf))
+  }
 
-    public static func lower(_ value: String) -> RustBuffer {
-        return value.utf8CString.withUnsafeBufferPointer { ptr in
-            // The swift string gives us int8_t, we want uint8_t.
-            ptr.withMemoryRebound(to: UInt8.self) { ptr in
-                // The swift string gives us a trailing null byte, we don't want it.
-                let buf = UnsafeBufferPointer(rebasing: ptr.prefix(upTo: ptr.count - 1))
-                return RustBuffer.from(buf)
-            }
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
-        let len: Int32 = try readInt(&buf)
-        // See `lift` above for why we avoid Foundation's NSString-backed decoder here.
-        return String(decoding: try readBytes(&buf, count: Int(len)), as: UTF8.self)
-    }
-
-    public static func write(_ value: String, into buf: inout [UInt8]) {
-        let len = Int32(value.utf8.count)
-        writeInt(&buf, len)
-        writeBytes(&buf, value.utf8)
-    }
+  public static func write(_ value: Double, into buf: inout [UInt8]) {
+    writeDouble(&buf, lower(value))
+  }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterData: FfiConverterRustBuffer {
-    typealias SwiftType = Data
+private struct FfiConverterBool: FfiConverter {
+  typealias FfiType = Int8
+  typealias SwiftType = Bool
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
-        let len: Int32 = try readInt(&buf)
-        return Data(try readBytes(&buf, count: Int(len)))
-    }
+  public static func lift(_ value: Int8) throws -> Bool {
+    return value != 0
+  }
 
-    public static func write(_ value: Data, into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        writeBytes(&buf, value)
-    }
+  public static func lower(_ value: Bool) -> Int8 {
+    return value ? 1 : 0
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
+    return try lift(readInt(&buf))
+  }
+
+  public static func write(_ value: Bool, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
 }
 
-
-
-
-/**
- * Blocking JSON-RPC client. One method per call the box needs —
- * nothing else crosses the FFI.
- */
-public protocol NearRpcProtocol: AnyObject, Sendable {
-    
-    /**
-     * Nonce + permission for an access key. Errors when the key is absent.
-     */
-    func accessKey(accountId: String, publicKey: String) throws  -> AccessKeyInfo
-    
-    /**
-     * Broadcast a signed tx, waiting for commitment.
-     */
-    func broadcastCommit(signedTxB64: String) throws  -> TxOutcome
-    
-    /**
-     * Latest final block hash (hex) and height.
-     */
-    func latestBlock() throws  -> BlockRef
-    
-    /**
-     * The MPC-derived Ed25519 key at a FastAuth path. Pure view call —
-     * no auth needed. Path shape `jwt#https://<domain>/#<sub>`,
-     * predecessor is the fast-auth contract, domain 1 is Ed25519.
-     * Verified live against `v1.signer-prod.testnet`.
-     */
-    func mpcPublicKey(mpcContract: String, fastAuthContract: String, path: String) throws  -> String
-    
-    /**
-     * Submit a `sign` call on the fast-auth contract from a funded local
-     * key (dev/testnet path). Returns the raw MPC signature bytes.
-     * Production submission rides a controlled relayer instead — same
-     * bytes, different payer.
-     */
-    func submitSignCall(signerSecretB64: String, fastAuthContract: String, guardId: String, jwt: String, signPayloadHex: String, algorithm: String, depositYocto: String) throws  -> Data
-    
-    /**
-     * Raw bytes of a contract view call result.
-     */
-    func viewCall(contractId: String, method: String, argsJson: String) throws  -> Data
-    
-}
-/**
- * Blocking JSON-RPC client. One method per call the box needs —
- * nothing else crosses the FFI.
- */
-open class NearRpc: NearRpcProtocol, @unchecked Sendable {
-    fileprivate let handle: UInt64
-
-    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
 #if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterString: FfiConverter {
+  typealias SwiftType = String
+  typealias FfiType = RustBuffer
+
+  public static func lift(_ value: RustBuffer) throws -> String {
+    defer {
+      value.deallocate()
+    }
+    if value.data == nil {
+      return String()
+    }
+    let bytes = UnsafeBufferPointer<UInt8>(start: value.data!, count: Int(value.len))
+    // Use Swift's native UTF-8 decoder; `String(bytes:encoding:.utf8)` goes
+    // through Foundation's NSString and silently strips a leading U+FEFF BOM.
+    // Invalid UTF-8 substitutes U+FFFD instead of trapping (unreachable
+    // given Rust's `String` invariant).
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+  public static func lower(_ value: String) -> RustBuffer {
+    return value.utf8CString.withUnsafeBufferPointer { ptr in
+      // The swift string gives us int8_t, we want uint8_t.
+      ptr.withMemoryRebound(to: UInt8.self) { ptr in
+        // The swift string gives us a trailing null byte, we don't want it.
+        let buf = UnsafeBufferPointer(rebasing: ptr.prefix(upTo: ptr.count - 1))
+        return RustBuffer.from(buf)
+      }
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
+    let len: Int32 = try readInt(&buf)
+    // See `lift` above for why we avoid Foundation's NSString-backed decoder here.
+    return String(decoding: try readBytes(&buf, count: Int(len)), as: UTF8.self)
+  }
+
+  public static func write(_ value: String, into buf: inout [UInt8]) {
+    let len = Int32(value.utf8.count)
+    writeInt(&buf, len)
+    writeBytes(&buf, value.utf8)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterData: FfiConverterRustBuffer {
+  typealias SwiftType = Data
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+    let len: Int32 = try readInt(&buf)
+    return Data(try readBytes(&buf, count: Int(len)))
+  }
+
+  public static func write(_ value: Data, into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    writeBytes(&buf, value)
+  }
+}
+
+/// Blocking 1Click client. One method per call the box needs — nothing
+/// else crosses the FFI.
+public protocol NearIntentsProtocol: AnyObject, Sendable {
+
+  /**
+   * Price a swap. `dry = true` previews; `false` reserves a deposit
+   * address the user must fund before the deadline.
+   */
+  func quote(req: IntentQuoteRequest) throws -> IntentQuote
+
+  /**
+   * Poll until terminal: `Success`, `Refunded`, or `Failed`.
+   */
+  func status(depositAddress: String) throws -> IntentStatusReport
+
+  /**
+   * Notify 1Click after funding the deposit address, to speed up
+   * detection. Returns the current execution state.
+   */
+  func submitDeposit(depositAddress: String, txHash: String) throws -> IntentStatusReport
+
+  /**
+   * Swappable assets. Unauthenticated upstream; the key stays home.
+   */
+  func tokens() throws -> [IntentToken]
+
+}
+/// Blocking 1Click client. One method per call the box needs — nothing
+/// else crosses the FFI.
+open class NearIntents: NearIntentsProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public struct NoHandle {
-        public init() {}
-    }
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
 
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-#if swift(>=5.8)
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    required public init(unsafeFromHandle handle: UInt64) {
-        self.handle = handle
-    }
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
 
-    // This constructor can be used to instantiate a fake object.
-    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    //
-    // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
-#if swift(>=5.8)
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public init(noHandle: NoHandle) {
-        self.handle = 0
-    }
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
 
-#if swift(>=5.8)
+  #if swift(>=5.8)
     @_documentation(visibility: private)
-#endif
-    public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_runner_near_core_fn_clone_nearrpc(self.handle, $0) }
-    }
-public convenience init(rpcUrl: String)throws  {
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_runner_near_core_fn_clone_nearintents(self.handle, $0) }
+  }
+  public convenience init(baseUrl: String, apiKey: String) throws {
     let handle =
-        try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
-    uniffi_runner_near_core_fn_constructor_nearrpc_new(
-        FfiConverterString.lower(rpcUrl),uniffiCallStatus
-    )
-}
+        uniffi_runner_near_core_fn_constructor_nearintents_new(
+          FfiConverterString.lower(baseUrl),
+          FfiConverterString.lower(apiKey), uniffiCallStatus
+        )
+      }
     self.init(unsafeFromHandle: handle)
-}
+  }
 
-    deinit {
-        if handle == 0 {
-            // Mock objects have handle=0 don't try to free them
-            return
-        }
-
-        try! rustCall { uniffi_runner_near_core_fn_free_nearrpc(handle, $0) }
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
     }
 
-    
+    try! rustCall { uniffi_runner_near_core_fn_free_nearintents(handle, $0) }
+  }
 
-    
-    /**
-     * Nonce + permission for an access key. Errors when the key is absent.
-     */
-open func accessKey(accountId: String, publicKey: String)throws  -> AccessKeyInfo  {
-    return try  FfiConverterTypeAccessKeyInfo_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+  /**
+   * Price a swap. `dry = true` previews; `false` reserves a deposit
+   * address the user must fund before the deadline.
+   */
+  open func quote(req: IntentQuoteRequest) throws -> IntentQuote {
+    return try FfiConverterTypeIntentQuote_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_access_key(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(accountId),
-        FfiConverterString.lower(publicKey),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Broadcast a signed tx, waiting for commitment.
-     */
-open func broadcastCommit(signedTxB64: String)throws  -> TxOutcome  {
-    return try  FfiConverterTypeTxOutcome_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_broadcast_commit(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(signedTxB64),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Latest final block hash (hex) and height.
-     */
-open func latestBlock()throws  -> BlockRef  {
-    return try  FfiConverterTypeBlockRef_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_latest_block(
-            self.uniffiCloneHandle(),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * The MPC-derived Ed25519 key at a FastAuth path. Pure view call —
-     * no auth needed. Path shape `jwt#https://<domain>/#<sub>`,
-     * predecessor is the fast-auth contract, domain 1 is Ed25519.
-     * Verified live against `v1.signer-prod.testnet`.
-     */
-open func mpcPublicKey(mpcContract: String, fastAuthContract: String, path: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_mpc_public_key(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(mpcContract),
-        FfiConverterString.lower(fastAuthContract),
-        FfiConverterString.lower(path),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Submit a `sign` call on the fast-auth contract from a funded local
-     * key (dev/testnet path). Returns the raw MPC signature bytes.
-     * Production submission rides a controlled relayer instead — same
-     * bytes, different payer.
-     */
-open func submitSignCall(signerSecretB64: String, fastAuthContract: String, guardId: String, jwt: String, signPayloadHex: String, algorithm: String, depositYocto: String)throws  -> Data  {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_submit_sign_call(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(signerSecretB64),
-        FfiConverterString.lower(fastAuthContract),
-        FfiConverterString.lower(guardId),
-        FfiConverterString.lower(jwt),
-        FfiConverterString.lower(signPayloadHex),
-        FfiConverterString.lower(algorithm),
-        FfiConverterString.lower(depositYocto),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Raw bytes of a contract view call result.
-     */
-open func viewCall(contractId: String, method: String, argsJson: String)throws  -> Data  {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearrpc_view_call(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(contractId),
-        FfiConverterString.lower(method),
-        FfiConverterString.lower(argsJson),uniffiCallStatus
-    )
-})
-}
-    
+        uniffi_runner_near_core_fn_method_nearintents_quote(
+          self.uniffiCloneHandle(),
+          FfiConverterTypeIntentQuoteRequest_lower(req), uniffiCallStatus
+        )
+      })
+  }
 
-    
-}
+  /**
+   * Poll until terminal: `Success`, `Refunded`, or `Failed`.
+   */
+  open func status(depositAddress: String) throws -> IntentStatusReport {
+    return try FfiConverterTypeIntentStatusReport_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearintents_status(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(depositAddress), uniffiCallStatus
+        )
+      })
+  }
 
+  /**
+   * Notify 1Click after funding the deposit address, to speed up
+   * detection. Returns the current execution state.
+   */
+  open func submitDeposit(depositAddress: String, txHash: String) throws -> IntentStatusReport {
+    return try FfiConverterTypeIntentStatusReport_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearintents_submit_deposit(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(depositAddress),
+          FfiConverterString.lower(txHash), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * Swappable assets. Unauthenticated upstream; the key stays home.
+   */
+  open func tokens() throws -> [IntentToken] {
+    return try FfiConverterSequenceTypeIntentToken.lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearintents_tokens(
+          self.uniffiCloneHandle(), uniffiCallStatus
+        )
+      })
+  }
+
+}
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeNearIntents: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = NearIntents
+
+  public static func lift(_ handle: UInt64) throws -> NearIntents {
+    return NearIntents(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: NearIntents) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NearIntents {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: NearIntents, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNearIntents_lift(_ handle: UInt64) throws -> NearIntents {
+  return try FfiConverterTypeNearIntents.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNearIntents_lower(_ value: NearIntents) -> UInt64 {
+  return FfiConverterTypeNearIntents.lower(value)
+}
+
+/// Blocking JSON-RPC client. One method per call the box needs —
+/// nothing else crosses the FFI.
+public protocol NearRpcProtocol: AnyObject, Sendable {
+
+  /**
+   * Nonce + permission for an access key. Errors when the key is absent.
+   */
+  func accessKey(accountId: String, publicKey: String) throws -> AccessKeyInfo
+
+  /**
+   * Broadcast a signed tx, waiting for commitment.
+   */
+  func broadcastCommit(signedTxB64: String) throws -> TxOutcome
+
+  /**
+   * Latest final block hash (hex) and height.
+   */
+  func latestBlock() throws -> BlockRef
+
+  /**
+   * The MPC-derived Ed25519 key at a FastAuth path. Pure view call —
+   * no auth needed. Path shape `jwt#https://<domain>/#<sub>`,
+   * predecessor is the fast-auth contract, domain 1 is Ed25519.
+   * Verified live against `v1.signer-prod.testnet`.
+   */
+  func mpcPublicKey(mpcContract: String, fastAuthContract: String, path: String) throws -> String
+
+  /**
+   * Submit a `sign` call on the fast-auth contract from a funded local
+   * key (dev/testnet path). Returns the raw MPC signature bytes.
+   * Production submission rides a controlled relayer instead — same
+   * bytes, different payer.
+   */
+  func submitSignCall(
+    signerSecretB64: String, fastAuthContract: String, guardId: String, jwt: String,
+    signPayloadHex: String, algorithm: String, depositYocto: String
+  ) throws -> Data
+
+  /**
+   * Raw bytes of a contract view call result.
+   */
+  func viewCall(contractId: String, method: String, argsJson: String) throws -> Data
+
+}
+/// Blocking JSON-RPC client. One method per call the box needs —
+/// nothing else crosses the FFI.
+open class NearRpc: NearRpcProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_runner_near_core_fn_clone_nearrpc(self.handle, $0) }
+  }
+  public convenience init(rpcUrl: String) throws {
+    let handle =
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_constructor_nearrpc_new(
+          FfiConverterString.lower(rpcUrl), uniffiCallStatus
+        )
+      }
+    self.init(unsafeFromHandle: handle)
+  }
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_runner_near_core_fn_free_nearrpc(handle, $0) }
+  }
+
+  /**
+   * Nonce + permission for an access key. Errors when the key is absent.
+   */
+  open func accessKey(accountId: String, publicKey: String) throws -> AccessKeyInfo {
+    return try FfiConverterTypeAccessKeyInfo_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_access_key(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(accountId),
+          FfiConverterString.lower(publicKey), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * Broadcast a signed tx, waiting for commitment.
+   */
+  open func broadcastCommit(signedTxB64: String) throws -> TxOutcome {
+    return try FfiConverterTypeTxOutcome_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_broadcast_commit(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(signedTxB64), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * Latest final block hash (hex) and height.
+   */
+  open func latestBlock() throws -> BlockRef {
+    return try FfiConverterTypeBlockRef_lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_latest_block(
+          self.uniffiCloneHandle(), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * The MPC-derived Ed25519 key at a FastAuth path. Pure view call —
+   * no auth needed. Path shape `jwt#https://<domain>/#<sub>`,
+   * predecessor is the fast-auth contract, domain 1 is Ed25519.
+   * Verified live against `v1.signer-prod.testnet`.
+   */
+  open func mpcPublicKey(mpcContract: String, fastAuthContract: String, path: String) throws
+    -> String
+  {
+    return try FfiConverterString.lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_mpc_public_key(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(mpcContract),
+          FfiConverterString.lower(fastAuthContract),
+          FfiConverterString.lower(path), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * Submit a `sign` call on the fast-auth contract from a funded local
+   * key (dev/testnet path). Returns the raw MPC signature bytes.
+   * Production submission rides a controlled relayer instead — same
+   * bytes, different payer.
+   */
+  open func submitSignCall(
+    signerSecretB64: String, fastAuthContract: String, guardId: String, jwt: String,
+    signPayloadHex: String, algorithm: String, depositYocto: String
+  ) throws -> Data {
+    return try FfiConverterData.lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_submit_sign_call(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(signerSecretB64),
+          FfiConverterString.lower(fastAuthContract),
+          FfiConverterString.lower(guardId),
+          FfiConverterString.lower(jwt),
+          FfiConverterString.lower(signPayloadHex),
+          FfiConverterString.lower(algorithm),
+          FfiConverterString.lower(depositYocto), uniffiCallStatus
+        )
+      })
+  }
+
+  /**
+   * Raw bytes of a contract view call result.
+   */
+  open func viewCall(contractId: String, method: String, argsJson: String) throws -> Data {
+    return try FfiConverterData.lift(
+      try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+        uniffi_runner_near_core_fn_method_nearrpc_view_call(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(contractId),
+          FfiConverterString.lower(method),
+          FfiConverterString.lower(argsJson), uniffiCallStatus
+        )
+      })
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeNearRpc: FfiConverter {
-    typealias FfiType = UInt64
-    typealias SwiftType = NearRpc
+  typealias FfiType = UInt64
+  typealias SwiftType = NearRpc
 
-    public static func lift(_ handle: UInt64) throws -> NearRpc {
-        return NearRpc(unsafeFromHandle: handle)
-    }
+  public static func lift(_ handle: UInt64) throws -> NearRpc {
+    return NearRpc(unsafeFromHandle: handle)
+  }
 
-    public static func lower(_ value: NearRpc) -> UInt64 {
-        return value.uniffiCloneHandle()
-    }
+  public static func lower(_ value: NearRpc) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NearRpc {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NearRpc {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
 
-    public static func write(_ value: NearRpc, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
+  public static func write(_ value: NearRpc, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeNearRpc_lift(_ handle: UInt64) throws -> NearRpc {
-    return try FfiConverterTypeNearRpc.lift(handle)
+  return try FfiConverterTypeNearRpc.lift(handle)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeNearRpc_lower(_ value: NearRpc) -> UInt64 {
-    return FfiConverterTypeNearRpc.lower(value)
+  return FfiConverterTypeNearRpc.lower(value)
 }
-
-
-
 
 public struct AccessKeyInfo: Equatable, Hashable {
-    public var nonce: UInt64
-    public var fullAccess: Bool
+  public var nonce: UInt64
+  public var fullAccess: Bool
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(nonce: UInt64, fullAccess: Bool) {
-        self.nonce = nonce
-        self.fullAccess = fullAccess
-    }
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(nonce: UInt64, fullAccess: Bool) {
+    self.nonce = nonce
+    self.fullAccess = fullAccess
+  }
 
-    
-
-    
 }
 
 #if compiler(>=6)
-extension AccessKeyInfo: Sendable {}
+  extension AccessKeyInfo: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeAccessKeyInfo: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AccessKeyInfo {
-        return
-            try AccessKeyInfo(
-                nonce: FfiConverterUInt64.read(from: &buf), 
-                fullAccess: FfiConverterBool.read(from: &buf)
-        )
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AccessKeyInfo
+  {
+    return
+      try AccessKeyInfo(
+        nonce: FfiConverterUInt64.read(from: &buf),
+        fullAccess: FfiConverterBool.read(from: &buf)
+      )
+  }
 
-    public static func write(_ value: AccessKeyInfo, into buf: inout [UInt8]) {
-        FfiConverterUInt64.write(value.nonce, into: &buf)
-        FfiConverterBool.write(value.fullAccess, into: &buf)
-    }
+  public static func write(_ value: AccessKeyInfo, into buf: inout [UInt8]) {
+    FfiConverterUInt64.write(value.nonce, into: &buf)
+    FfiConverterBool.write(value.fullAccess, into: &buf)
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeAccessKeyInfo_lift(_ buf: RustBuffer) throws -> AccessKeyInfo {
-    return try FfiConverterTypeAccessKeyInfo.lift(buf)
+  return try FfiConverterTypeAccessKeyInfo.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeAccessKeyInfo_lower(_ value: AccessKeyInfo) -> RustBuffer {
-    return FfiConverterTypeAccessKeyInfo.lower(value)
+  return FfiConverterTypeAccessKeyInfo.lower(value)
 }
-
 
 public struct BlockRef: Equatable, Hashable {
-    public var hashHex: String
-    public var height: UInt64
+  public var hashHex: String
+  public var height: UInt64
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(hashHex: String, height: UInt64) {
-        self.hashHex = hashHex
-        self.height = height
-    }
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(hashHex: String, height: UInt64) {
+    self.hashHex = hashHex
+    self.height = height
+  }
 
-    
-
-    
 }
 
 #if compiler(>=6)
-extension BlockRef: Sendable {}
+  extension BlockRef: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeBlockRef: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BlockRef {
-        return
-            try BlockRef(
-                hashHex: FfiConverterString.read(from: &buf), 
-                height: FfiConverterUInt64.read(from: &buf)
-        )
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BlockRef {
+    return
+      try BlockRef(
+        hashHex: FfiConverterString.read(from: &buf),
+        height: FfiConverterUInt64.read(from: &buf)
+      )
+  }
 
-    public static func write(_ value: BlockRef, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.hashHex, into: &buf)
-        FfiConverterUInt64.write(value.height, into: &buf)
-    }
+  public static func write(_ value: BlockRef, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.hashHex, into: &buf)
+    FfiConverterUInt64.write(value.height, into: &buf)
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeBlockRef_lift(_ buf: RustBuffer) throws -> BlockRef {
-    return try FfiConverterTypeBlockRef.lift(buf)
+  return try FfiConverterTypeBlockRef.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeBlockRef_lower(_ value: BlockRef) -> RustBuffer {
-    return FfiConverterTypeBlockRef.lower(value)
+  return FfiConverterTypeBlockRef.lower(value)
 }
 
-
-/**
- * A fresh Ed25519 keypair. Secret is base64 seed; public key is the
- * `ed25519:<base58>` NEAR form.
- */
+/// A fresh Ed25519 keypair. Secret is base64 seed; public key is the
+/// `ed25519:<base58>` NEAR form.
 public struct EdKeypair: Equatable, Hashable {
-    public var secretB64: String
-    public var publicKey: String
+  public var secretB64: String
+  public var publicKey: String
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(secretB64: String, publicKey: String) {
-        self.secretB64 = secretB64
-        self.publicKey = publicKey
-    }
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(secretB64: String, publicKey: String) {
+    self.secretB64 = secretB64
+    self.publicKey = publicKey
+  }
 
-    
-
-    
 }
 
 #if compiler(>=6)
-extension EdKeypair: Sendable {}
+  extension EdKeypair: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeEdKeypair: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdKeypair {
-        return
-            try EdKeypair(
-                secretB64: FfiConverterString.read(from: &buf), 
-                publicKey: FfiConverterString.read(from: &buf)
-        )
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdKeypair {
+    return
+      try EdKeypair(
+        secretB64: FfiConverterString.read(from: &buf),
+        publicKey: FfiConverterString.read(from: &buf)
+      )
+  }
 
-    public static func write(_ value: EdKeypair, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.secretB64, into: &buf)
-        FfiConverterString.write(value.publicKey, into: &buf)
-    }
+  public static func write(_ value: EdKeypair, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.secretB64, into: &buf)
+    FfiConverterString.write(value.publicKey, into: &buf)
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeEdKeypair_lift(_ buf: RustBuffer) throws -> EdKeypair {
-    return try FfiConverterTypeEdKeypair.lift(buf)
+  return try FfiConverterTypeEdKeypair.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeEdKeypair_lower(_ value: EdKeypair) -> RustBuffer {
-    return FfiConverterTypeEdKeypair.lower(value)
+  return FfiConverterTypeEdKeypair.lower(value)
 }
 
+public struct IntentQuote: Equatable, Hashable {
+  public var depositAddress: String?
+  public var amountIn: String
+  public var amountOut: String
+  public var minAmountOut: String
+  public var deadline: String?
+  public var timeEstimateSecs: Double
 
-/**
- * Outcome of a committed transaction, in app-readable shape.
- */
-public struct TxOutcome: Equatable, Hashable {
-    public var txHashHex: String
-    public var success: Bool
-    public var failure: String?
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    depositAddress: String?, amountIn: String, amountOut: String, minAmountOut: String,
+    deadline: String?, timeEstimateSecs: Double
+  ) {
+    self.depositAddress = depositAddress
+    self.amountIn = amountIn
+    self.amountOut = amountOut
+    self.minAmountOut = minAmountOut
+    self.deadline = deadline
+    self.timeEstimateSecs = timeEstimateSecs
+  }
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(txHashHex: String, success: Bool, failure: String?) {
-        self.txHashHex = txHashHex
-        self.success = success
-        self.failure = failure
-    }
-
-    
-
-    
 }
 
 #if compiler(>=6)
-extension TxOutcome: Sendable {}
+  extension IntentQuote: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIntentQuote: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentQuote {
+    return
+      try IntentQuote(
+        depositAddress: FfiConverterOptionString.read(from: &buf),
+        amountIn: FfiConverterString.read(from: &buf),
+        amountOut: FfiConverterString.read(from: &buf),
+        minAmountOut: FfiConverterString.read(from: &buf),
+        deadline: FfiConverterOptionString.read(from: &buf),
+        timeEstimateSecs: FfiConverterDouble.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: IntentQuote, into buf: inout [UInt8]) {
+    FfiConverterOptionString.write(value.depositAddress, into: &buf)
+    FfiConverterString.write(value.amountIn, into: &buf)
+    FfiConverterString.write(value.amountOut, into: &buf)
+    FfiConverterString.write(value.minAmountOut, into: &buf)
+    FfiConverterOptionString.write(value.deadline, into: &buf)
+    FfiConverterDouble.write(value.timeEstimateSecs, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentQuote_lift(_ buf: RustBuffer) throws -> IntentQuote {
+  return try FfiConverterTypeIntentQuote.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentQuote_lower(_ value: IntentQuote) -> RustBuffer {
+  return FfiConverterTypeIntentQuote.lower(value)
+}
+
+/// Quote parameters. `dry = true` previews without a deposit address;
+/// `dry = false` reserves one (≈10 min validity).
+public struct IntentQuoteRequest: Equatable, Hashable {
+  public var dry: Bool
+  public var swapType: String
+  public var slippageBps: UInt32
+  public var originAsset: String
+  public var depositType: String
+  public var destinationAsset: String
+  public var amount: String
+  public var refundTo: String
+  public var refundType: String
+  public var recipient: String
+  public var recipientType: String
+  public var deadline: String
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    dry: Bool, swapType: String, slippageBps: UInt32, originAsset: String, depositType: String,
+    destinationAsset: String, amount: String, refundTo: String, refundType: String,
+    recipient: String, recipientType: String, deadline: String
+  ) {
+    self.dry = dry
+    self.swapType = swapType
+    self.slippageBps = slippageBps
+    self.originAsset = originAsset
+    self.depositType = depositType
+    self.destinationAsset = destinationAsset
+    self.amount = amount
+    self.refundTo = refundTo
+    self.refundType = refundType
+    self.recipient = recipient
+    self.recipientType = recipientType
+    self.deadline = deadline
+  }
+
+}
+
+#if compiler(>=6)
+  extension IntentQuoteRequest: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIntentQuoteRequest: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> IntentQuoteRequest
+  {
+    return
+      try IntentQuoteRequest(
+        dry: FfiConverterBool.read(from: &buf),
+        swapType: FfiConverterString.read(from: &buf),
+        slippageBps: FfiConverterUInt32.read(from: &buf),
+        originAsset: FfiConverterString.read(from: &buf),
+        depositType: FfiConverterString.read(from: &buf),
+        destinationAsset: FfiConverterString.read(from: &buf),
+        amount: FfiConverterString.read(from: &buf),
+        refundTo: FfiConverterString.read(from: &buf),
+        refundType: FfiConverterString.read(from: &buf),
+        recipient: FfiConverterString.read(from: &buf),
+        recipientType: FfiConverterString.read(from: &buf),
+        deadline: FfiConverterString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: IntentQuoteRequest, into buf: inout [UInt8]) {
+    FfiConverterBool.write(value.dry, into: &buf)
+    FfiConverterString.write(value.swapType, into: &buf)
+    FfiConverterUInt32.write(value.slippageBps, into: &buf)
+    FfiConverterString.write(value.originAsset, into: &buf)
+    FfiConverterString.write(value.depositType, into: &buf)
+    FfiConverterString.write(value.destinationAsset, into: &buf)
+    FfiConverterString.write(value.amount, into: &buf)
+    FfiConverterString.write(value.refundTo, into: &buf)
+    FfiConverterString.write(value.refundType, into: &buf)
+    FfiConverterString.write(value.recipient, into: &buf)
+    FfiConverterString.write(value.recipientType, into: &buf)
+    FfiConverterString.write(value.deadline, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentQuoteRequest_lift(_ buf: RustBuffer) throws -> IntentQuoteRequest
+{
+  return try FfiConverterTypeIntentQuoteRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentQuoteRequest_lower(_ value: IntentQuoteRequest) -> RustBuffer {
+  return FfiConverterTypeIntentQuoteRequest.lower(value)
+}
+
+public struct IntentStatusReport: Equatable, Hashable {
+  public var status: IntentStatus
+  public var updatedAt: String
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(status: IntentStatus, updatedAt: String) {
+    self.status = status
+    self.updatedAt = updatedAt
+  }
+
+}
+
+#if compiler(>=6)
+  extension IntentStatusReport: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIntentStatusReport: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> IntentStatusReport
+  {
+    return
+      try IntentStatusReport(
+        status: FfiConverterTypeIntentStatus.read(from: &buf),
+        updatedAt: FfiConverterString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: IntentStatusReport, into buf: inout [UInt8]) {
+    FfiConverterTypeIntentStatus.write(value.status, into: &buf)
+    FfiConverterString.write(value.updatedAt, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentStatusReport_lift(_ buf: RustBuffer) throws -> IntentStatusReport
+{
+  return try FfiConverterTypeIntentStatusReport.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentStatusReport_lower(_ value: IntentStatusReport) -> RustBuffer {
+  return FfiConverterTypeIntentStatusReport.lower(value)
+}
+
+/// One swappable asset, in UniFFI-safe shape. Amounts ride as decimal
+/// strings everywhere else; only the static `decimals` count is numeric.
+public struct IntentToken: Equatable, Hashable {
+  public var assetId: String
+  public var symbol: String
+  public var decimals: UInt32
+  public var blockchain: String
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(assetId: String, symbol: String, decimals: UInt32, blockchain: String) {
+    self.assetId = assetId
+    self.symbol = symbol
+    self.decimals = decimals
+    self.blockchain = blockchain
+  }
+
+}
+
+#if compiler(>=6)
+  extension IntentToken: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIntentToken: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentToken {
+    return
+      try IntentToken(
+        assetId: FfiConverterString.read(from: &buf),
+        symbol: FfiConverterString.read(from: &buf),
+        decimals: FfiConverterUInt32.read(from: &buf),
+        blockchain: FfiConverterString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: IntentToken, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.assetId, into: &buf)
+    FfiConverterString.write(value.symbol, into: &buf)
+    FfiConverterUInt32.write(value.decimals, into: &buf)
+    FfiConverterString.write(value.blockchain, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentToken_lift(_ buf: RustBuffer) throws -> IntentToken {
+  return try FfiConverterTypeIntentToken.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentToken_lower(_ value: IntentToken) -> RustBuffer {
+  return FfiConverterTypeIntentToken.lower(value)
+}
+
+/// Outcome of a committed transaction, in app-readable shape.
+public struct TxOutcome: Equatable, Hashable {
+  public var txHashHex: String
+  public var success: Bool
+  public var failure: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(txHashHex: String, success: Bool, failure: String?) {
+    self.txHashHex = txHashHex
+    self.success = success
+    self.failure = failure
+  }
+
+}
+
+#if compiler(>=6)
+  extension TxOutcome: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeTxOutcome: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TxOutcome {
-        return
-            try TxOutcome(
-                txHashHex: FfiConverterString.read(from: &buf), 
-                success: FfiConverterBool.read(from: &buf), 
-                failure: FfiConverterOptionString.read(from: &buf)
-        )
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TxOutcome {
+    return
+      try TxOutcome(
+        txHashHex: FfiConverterString.read(from: &buf),
+        success: FfiConverterBool.read(from: &buf),
+        failure: FfiConverterOptionString.read(from: &buf)
+      )
+  }
 
-    public static func write(_ value: TxOutcome, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.txHashHex, into: &buf)
-        FfiConverterBool.write(value.success, into: &buf)
-        FfiConverterOptionString.write(value.failure, into: &buf)
-    }
+  public static func write(_ value: TxOutcome, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.txHashHex, into: &buf)
+    FfiConverterBool.write(value.success, into: &buf)
+    FfiConverterOptionString.write(value.failure, into: &buf)
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTxOutcome_lift(_ buf: RustBuffer) throws -> TxOutcome {
-    return try FfiConverterTypeTxOutcome.lift(buf)
+  return try FfiConverterTypeTxOutcome.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTxOutcome_lower(_ value: TxOutcome) -> RustBuffer {
-    return FfiConverterTypeTxOutcome.lower(value)
+  return FfiConverterTypeTxOutcome.lower(value)
 }
 
+/// Every failure mode of the core, typed once.
+public
+  enum CoreError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError
+{
 
-/**
- * Every failure mode of the core, typed once.
- */
-public 
-enum CoreError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+  case InvalidInput(
+    String
+  )
+  case Crypto(
+    String
+  )
+  case Transport(
+    String
+  )
+  case Chain(
+    code: String, detail: String
+  )
 
-    
-    
-    case InvalidInput(String
-    )
-    case Crypto(String
-    )
-    case Transport(String
-    )
-    case Chain(code: String, detail: String
-    )
+  public var errorDescription: String? {
+    String(reflecting: self)
+  }
 
-    
-
-    
-
-    
-    public var errorDescription: String? {
-        String(reflecting: self)
-    }
-    
 }
 
 #if compiler(>=6)
-extension CoreError: Sendable {}
+  extension CoreError: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeCoreError: FfiConverterRustBuffer {
-    typealias SwiftType = CoreError
+  typealias SwiftType = CoreError
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CoreError {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CoreError {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
 
-        
+    case 1:
+      return .InvalidInput(
+        try FfiConverterString.read(from: &buf)
+      )
+    case 2:
+      return .Crypto(
+        try FfiConverterString.read(from: &buf)
+      )
+    case 3:
+      return .Transport(
+        try FfiConverterString.read(from: &buf)
+      )
+    case 4:
+      return .Chain(
+        code: try FfiConverterString.read(from: &buf),
+        detail: try FfiConverterString.read(from: &buf)
+      )
 
-        
-        case 1: return .InvalidInput(
-            try FfiConverterString.read(from: &buf)
-            )
-        case 2: return .Crypto(
-            try FfiConverterString.read(from: &buf)
-            )
-        case 3: return .Transport(
-            try FfiConverterString.read(from: &buf)
-            )
-        case 4: return .Chain(
-            code: try FfiConverterString.read(from: &buf), 
-            detail: try FfiConverterString.read(from: &buf)
-            )
-
-         default: throw UniffiInternalError.unexpectedEnumCase
-        }
+    default: throw UniffiInternalError.unexpectedEnumCase
     }
+  }
 
-    public static func write(_ value: CoreError, into buf: inout [UInt8]) {
-        switch value {
+  public static func write(_ value: CoreError, into buf: inout [UInt8]) {
+    switch value {
 
-        
+    case .InvalidInput(let v1):
+      writeInt(&buf, Int32(1))
+      FfiConverterString.write(v1, into: &buf)
 
-        
-        
-        case let .InvalidInput(v1):
-            writeInt(&buf, Int32(1))
-            FfiConverterString.write(v1, into: &buf)
-            
-        
-        case let .Crypto(v1):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(v1, into: &buf)
-            
-        
-        case let .Transport(v1):
-            writeInt(&buf, Int32(3))
-            FfiConverterString.write(v1, into: &buf)
-            
-        
-        case let .Chain(code,detail):
-            writeInt(&buf, Int32(4))
-            FfiConverterString.write(code, into: &buf)
-            FfiConverterString.write(detail, into: &buf)
-            
-        }
+    case .Crypto(let v1):
+      writeInt(&buf, Int32(2))
+      FfiConverterString.write(v1, into: &buf)
+
+    case .Transport(let v1):
+      writeInt(&buf, Int32(3))
+      FfiConverterString.write(v1, into: &buf)
+
+    case .Chain(let code, let detail):
+      writeInt(&buf, Int32(4))
+      FfiConverterString.write(code, into: &buf)
+      FfiConverterString.write(detail, into: &buf)
+
     }
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeCoreError_lift(_ buf: RustBuffer) throws -> CoreError {
-    return try FfiConverterTypeCoreError.lift(buf)
+  return try FfiConverterTypeCoreError.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeCoreError_lower(_ value: CoreError) -> RustBuffer {
-    return FfiConverterTypeCoreError.lower(value)
+  return FfiConverterTypeCoreError.lower(value)
 }
 
+/**
+ * Terminal states included: poll until `Success`, `Refunded`, or `Failed`.
+ * Byte-identical to the upstream `Status` renames.
+ */
+
+public enum IntentStatus: Equatable, Hashable {
+
+  case pendingDeposit
+  case knownDepositTx
+  case incompleteDeposit
+  case processing
+  case success
+  case refunded
+  case failed
+
+}
+
+#if compiler(>=6)
+  extension IntentStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIntentStatus: FfiConverterRustBuffer {
+  typealias SwiftType = IntentStatus
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentStatus {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .pendingDeposit
+
+    case 2: return .knownDepositTx
+
+    case 3: return .incompleteDeposit
+
+    case 4: return .processing
+
+    case 5: return .success
+
+    case 6: return .refunded
+
+    case 7: return .failed
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: IntentStatus, into buf: inout [UInt8]) {
+    switch value {
+
+    case .pendingDeposit:
+      writeInt(&buf, Int32(1))
+
+    case .knownDepositTx:
+      writeInt(&buf, Int32(2))
+
+    case .incompleteDeposit:
+      writeInt(&buf, Int32(3))
+
+    case .processing:
+      writeInt(&buf, Int32(4))
+
+    case .success:
+      writeInt(&buf, Int32(5))
+
+    case .refunded:
+      writeInt(&buf, Int32(6))
+
+    case .failed:
+      writeInt(&buf, Int32(7))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentStatus_lift(_ buf: RustBuffer) throws -> IntentStatus {
+  return try FfiConverterTypeIntentStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIntentStatus_lower(_ value: IntentStatus) -> RustBuffer {
+  return FfiConverterTypeIntentStatus.lower(value)
+}
 
 /**
  * One unsigned transaction's action, in UniFFI-safe shape.
@@ -1163,269 +1723,317 @@ public func FfiConverterTypeCoreError_lower(_ value: CoreError) -> RustBuffer {
  */
 
 public enum TxAction: Equatable, Hashable {
-    
-    case transfer(amountYocto: String
-    )
-    case functionCall(method: String, argsJson: String, gas: UInt64, depositYocto: String
-    )
 
-
-
-
+  case transfer(
+    amountYocto: String
+  )
+  case functionCall(
+    method: String, argsJson: String, gas: UInt64, depositYocto: String
+  )
 
 }
 
 #if compiler(>=6)
-extension TxAction: Sendable {}
+  extension TxAction: Sendable {}
 #endif
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeTxAction: FfiConverterRustBuffer {
-    typealias SwiftType = TxAction
+  typealias SwiftType = TxAction
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TxAction {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .transfer(amountYocto: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 2: return .functionCall(method: try FfiConverterString.read(from: &buf), argsJson: try FfiConverterString.read(from: &buf), gas: try FfiConverterUInt64.read(from: &buf), depositYocto: try FfiConverterString.read(from: &buf)
-        )
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TxAction {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
 
-    public static func write(_ value: TxAction, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case let .transfer(amountYocto):
-            writeInt(&buf, Int32(1))
-            FfiConverterString.write(amountYocto, into: &buf)
-            
-        
-        case let .functionCall(method,argsJson,gas,depositYocto):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(method, into: &buf)
-            FfiConverterString.write(argsJson, into: &buf)
-            FfiConverterUInt64.write(gas, into: &buf)
-            FfiConverterString.write(depositYocto, into: &buf)
-            
-        }
+    case 1:
+      return .transfer(
+        amountYocto: try FfiConverterString.read(from: &buf)
+      )
+
+    case 2:
+      return .functionCall(
+        method: try FfiConverterString.read(from: &buf),
+        argsJson: try FfiConverterString.read(from: &buf),
+        gas: try FfiConverterUInt64.read(from: &buf),
+        depositYocto: try FfiConverterString.read(from: &buf)
+      )
+
+    default: throw UniffiInternalError.unexpectedEnumCase
     }
+  }
+
+  public static func write(_ value: TxAction, into buf: inout [UInt8]) {
+    switch value {
+
+    case .transfer(let amountYocto):
+      writeInt(&buf, Int32(1))
+      FfiConverterString.write(amountYocto, into: &buf)
+
+    case .functionCall(let method, let argsJson, let gas, let depositYocto):
+      writeInt(&buf, Int32(2))
+      FfiConverterString.write(method, into: &buf)
+      FfiConverterString.write(argsJson, into: &buf)
+      FfiConverterUInt64.write(gas, into: &buf)
+      FfiConverterString.write(depositYocto, into: &buf)
+
+    }
+  }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTxAction_lift(_ buf: RustBuffer) throws -> TxAction {
-    return try FfiConverterTypeTxAction.lift(buf)
+  return try FfiConverterTypeTxAction.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTxAction_lower(_ value: TxAction) -> RustBuffer {
-    return FfiConverterTypeTxAction.lower(value)
+  return FfiConverterTypeTxAction.lower(value)
 }
-
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+  @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
-    typealias SwiftType = String?
+private struct FfiConverterOptionString: FfiConverterRustBuffer {
+  typealias SwiftType = String?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterString.write(value, into: &buf)
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    guard let value = value else {
+      writeInt(&buf, Int8(0))
+      return
     }
+    writeInt(&buf, Int8(1))
+    FfiConverterString.write(value, into: &buf)
+  }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterString.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    switch try readInt(&buf) as Int8 {
+    case 0: return nil
+    case 1: return try FfiConverterString.read(from: &buf)
+    default: throw UniffiInternalError.unexpectedOptionalTag
     }
+  }
 }
-public func ed25519Keypair()throws  -> EdKeypair  {
-    return try  FfiConverterTypeEdKeypair_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_ed25519_keypair(uniffiCallStatus
-    )
-})
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterSequenceTypeIntentToken: FfiConverterRustBuffer {
+  typealias SwiftType = [IntentToken]
+
+  public static func write(_ value: [IntentToken], into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    for item in value {
+      FfiConverterTypeIntentToken.write(item, into: &buf)
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [IntentToken]
+  {
+    let len: Int32 = try readInt(&buf)
+    var seq = [IntentToken]()
+    seq.reserveCapacity(Int(len))
+    for _ in 0..<len {
+      seq.append(try FfiConverterTypeIntentToken.read(from: &buf))
+    }
+    return seq
+  }
 }
-public func ed25519Sign(secretB64: String, messageHex: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_ed25519_sign(
+public func ed25519Keypair() throws -> EdKeypair {
+  return try FfiConverterTypeEdKeypair_lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_ed25519_keypair(
+        uniffiCallStatus
+      )
+    })
+}
+public func ed25519Sign(secretB64: String, messageHex: String) throws -> String {
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_ed25519_sign(
         FfiConverterString.lower(secretB64),
-        FfiConverterString.lower(messageHex),uniffiCallStatus
-    )
-})
+        FfiConverterString.lower(messageHex), uniffiCallStatus
+      )
+    })
 }
-public func ed25519Verify(publicKey: String, messageHex: String, signatureB64: String)throws  -> Bool  {
-    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_ed25519_verify(
+public func ed25519Verify(publicKey: String, messageHex: String, signatureB64: String) throws
+  -> Bool
+{
+  return try FfiConverterBool.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_ed25519_verify(
         FfiConverterString.lower(publicKey),
         FfiConverterString.lower(messageHex),
-        FfiConverterString.lower(signatureB64),uniffiCallStatus
-    )
-})
+        FfiConverterString.lower(signatureB64), uniffiCallStatus
+      )
+    })
 }
-/**
- * Implicit account id for a key: hex of the 32 public-key bytes.
- */
-public func implicitAccountId(publicKey: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_implicit_account_id(
-        FfiConverterString.lower(publicKey),uniffiCallStatus
-    )
-})
+/// Implicit account id for a key: hex of the 32 public-key bytes.
+public func implicitAccountId(publicKey: String) throws -> String {
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_implicit_account_id(
+        FfiConverterString.lower(publicKey), uniffiCallStatus
+      )
+    })
 }
-/**
- * NEP-413 digest, byte-identical to `nep413Digest` in `apps/api`:
- * sha256(LE-u32(2^31+413) || borsh(message) || nonce || borsh(recipient) || 0x00).
- */
-public func nep413DigestHex(message: String, nonceB64: String, recipient: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_nep413_digest_hex(
+/// NEP-413 digest, byte-identical to `nep413Digest` in `apps/api`:
+/// sha256(LE-u32(2^31+413) || borsh(message) || nonce || borsh(recipient) || 0x00).
+public func nep413DigestHex(message: String, nonceB64: String, recipient: String) throws -> String {
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_nep413_digest_hex(
         FfiConverterString.lower(message),
         FfiConverterString.lower(nonceB64),
-        FfiConverterString.lower(recipient),uniffiCallStatus
-    )
-})
+        FfiConverterString.lower(recipient), uniffiCallStatus
+      )
+    })
 }
-/**
- * Attach a 64-byte signature to an unsigned tx. Returns signed Borsh as base64.
- */
-public func attachSignature(unsignedB64: String, signatureB64: String, publicKey: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_attach_signature(
+/// Attach a 64-byte signature to an unsigned tx. Returns signed Borsh as base64.
+public func attachSignature(unsignedB64: String, signatureB64: String, publicKey: String) throws
+  -> String
+{
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_attach_signature(
         FfiConverterString.lower(unsignedB64),
         FfiConverterString.lower(signatureB64),
-        FfiConverterString.lower(publicKey),uniffiCallStatus
-    )
-})
+        FfiConverterString.lower(publicKey), uniffiCallStatus
+      )
+    })
 }
-/**
- * Build an unsigned V0 transaction. Returns Borsh bytes as base64.
- * V0 (no priority fee) for maximal RPC compatibility.
- */
-public func buildUnsignedTx(sender: String, receiver: String, publicKey: String, nonce: UInt64, blockHashHex: String, action: TxAction)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_build_unsigned_tx(
+/// Build an unsigned V0 transaction. Returns Borsh bytes as base64.
+/// V0 (no priority fee) for maximal RPC compatibility.
+public func buildUnsignedTx(
+  sender: String, receiver: String, publicKey: String, nonce: UInt64, blockHashHex: String,
+  action: TxAction
+) throws -> String {
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_build_unsigned_tx(
         FfiConverterString.lower(sender),
         FfiConverterString.lower(receiver),
         FfiConverterString.lower(publicKey),
         FfiConverterUInt64.lower(nonce),
         FfiConverterString.lower(blockHashHex),
-        FfiConverterTypeTxAction_lower(action),uniffiCallStatus
-    )
-})
+        FfiConverterTypeTxAction_lower(action), uniffiCallStatus
+      )
+    })
 }
-/**
- * The 32-byte hash the signer (local key or MPC) signs. Hex.
- */
-public func txSigningHash(unsignedB64: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_func_tx_signing_hash(
-        FfiConverterString.lower(unsignedB64),uniffiCallStatus
-    )
-})
+/// The 32-byte hash the signer (local key or MPC) signs. Hex.
+public func txSigningHash(unsignedB64: String) throws -> String {
+  return try FfiConverterString.lift(
+    try rustCallWithError(FfiConverterTypeCoreError_lift) {
+      uniffiCallStatus in
+      uniffi_runner_near_core_fn_func_tx_signing_hash(
+        FfiConverterString.lower(unsignedB64), uniffiCallStatus
+      )
+    })
 }
 
 private enum InitializationResult {
-    case ok
-    case contractVersionMismatch
-    case apiChecksumMismatch
+  case ok
+  case contractVersionMismatch
+  case apiChecksumMismatch
 }
 // Use a global variable to perform the versioning checks. Swift ensures that
 // the code inside is only computed once.
 private let initializationResult: InitializationResult = {
-    // Get the bindings contract version from our ComponentInterface
-    let bindings_contract_version = 30
-    // Get the scaffolding contract version by calling the into the dylib
-    let scaffolding_contract_version = ffi_runner_near_core_uniffi_contract_version()
-    if bindings_contract_version != scaffolding_contract_version {
-        return InitializationResult.contractVersionMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_ed25519_keypair() != 4001) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_ed25519_sign() != 53282) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_ed25519_verify() != 22824) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_implicit_account_id() != 13406) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_nep413_digest_hex() != 25045) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_attach_signature() != 11102) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_build_unsigned_tx() != 56667) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_func_tx_signing_hash() != 13120) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_access_key() != 24695) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_broadcast_commit() != 56768) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_latest_block() != 33221) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_mpc_public_key() != 23443) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_submit_sign_call() != 28955) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearrpc_view_call() != 58802) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_constructor_nearrpc_new() != 37047) {
-        return InitializationResult.apiChecksumMismatch
-    }
+  // Get the bindings contract version from our ComponentInterface
+  let bindings_contract_version = 30
+  // Get the scaffolding contract version by calling the into the dylib
+  let scaffolding_contract_version = ffi_runner_near_core_uniffi_contract_version()
+  if bindings_contract_version != scaffolding_contract_version {
+    return InitializationResult.contractVersionMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_ed25519_keypair() != 4001 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_ed25519_sign() != 53282 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_ed25519_verify() != 22824 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_implicit_account_id() != 13406 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_nep413_digest_hex() != 25045 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_attach_signature() != 11102 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_build_unsigned_tx() != 56667 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_func_tx_signing_hash() != 13120 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_access_key() != 24695 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_broadcast_commit() != 56768 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_latest_block() != 33221 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_mpc_public_key() != 23443 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_submit_sign_call() != 28955 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearrpc_view_call() != 58802 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearintents_quote() != 65240 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearintents_status() != 28491 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearintents_submit_deposit() != 29535 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_method_nearintents_tokens() != 45959 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_constructor_nearrpc_new() != 37047 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_runner_near_core_checksum_constructor_nearintents_new() != 44686 {
+    return InitializationResult.apiChecksumMismatch
+  }
 
-    return InitializationResult.ok
+  return InitializationResult.ok
 }()
 
 // Make the ensure init function public so that other modules which have external type references to
 // our types can call it.
 public func uniffiEnsureRunnerNearCoreInitialized() {
-    switch initializationResult {
-    case .ok:
-        break
-    case .contractVersionMismatch:
-        fatalError("UniFFI contract version mismatch: try cleaning and rebuilding your project")
-    case .apiChecksumMismatch:
-        fatalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
+  switch initializationResult {
+  case .ok:
+    break
+  case .contractVersionMismatch:
+    fatalError("UniFFI contract version mismatch: try cleaning and rebuilding your project")
+  case .apiChecksumMismatch:
+    fatalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+  }
 }
 
 // swiftlint:enable all

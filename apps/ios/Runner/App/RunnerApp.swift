@@ -12,11 +12,7 @@ import SwiftUI
 struct RunnerApp: App {
   var body: some Scene {
     WindowGroup {
-      #if DEBUG
-        ProofHarnessView()
-      #else
-        EmptyView()
-      #endif
+      EmptyView()
     }
   }
 }

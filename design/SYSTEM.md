@@ -299,7 +299,7 @@ Living record of what was built. Update on every completed item.
 
 ## 2026-11-09 - Goal escrow contract + run proofs
 
-- Item: ORDER §10 and §13 goal escrow (G01-G05)
+- Item: ORDER ï¿½10 and ï¿½13 goal escrow (G01-G05)
 - What it is: NEAR contract in contracts/escrow. Runners lock their own token
   on a distance or distance-and-time goal; a server-signed run proof that beats
   it unlocks into an escrow balance they can withdraw or lock again; give up
@@ -315,3 +315,16 @@ Living record of what was built. Update on every completed item.
 - Gaps: not deployed; run proofs only exist for runs that pass the claim rules
   (2.5 km+, steps, 4 hour gap), so a second run within 4 hours cannot unlock a
   goal yet
+- 2026-11-09 simulator ceremony proof (iPhone 18 Pro sim, DEBUG harness):
+  two-phase passkey login â†’ signing JWT over a 1-yocto self-transfer,
+  `fatxn verified`, derived implicit account
+  `81bff4edb4f1d84629218de49a42aaa003730a0e599bed0d26cdf3c41ed2f383`
+  with key `ed25519:9jVMuqâ€¦`; live RPC confirms the key absent
+  (`unknown_access_key` @ block 276938107 â€” unfunded, as expected
+  pre-faucet). Tenant contract corrections that fell out: payload as
+  comma-joined bytes (not base64), no `audience` on plain login, signing
+  JWT arrives as `access_token` (no `id_token`), `fatxn` is a bare number
+  array. Swift suite now 31 tests. Proof harness lives on disk only
+  (out of git, DEBUG-only) with a localhost-capture hack until `runner://`
+  is allowlisted. Still open: faucet-fund the derived account, MPC `sign`
+  + broadcast the dust tx, production relayer submitter

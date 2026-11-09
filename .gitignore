@@ -73,3 +73,6 @@ dist/
 __pycache__/
 
 target/
+
+# DEBUG-only simulator ceremony proof; lives on disk, never committed.
+apps/ios/Runner/App/ProofHarness.swift
