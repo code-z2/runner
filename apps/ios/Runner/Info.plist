@@ -22,15 +22,25 @@
 	<true/>
 	<key>RunnerEnvironment</key>
 	<string>$(RUNNER_ENV)</string>
-	<key>CFBundleURLTypes</key>
+	<key>UIBackgroundModes</key>
 	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>runner</string>
-			</array>
-		</dict>
+		<string>location</string>
+		<string>audio</string>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Runner tracks your route, distance and pace while you run.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Runner keeps tracking in the background and on the lock screen so locking your phone never pauses your run.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Runner uses motion data for step cadence and rhythm cues.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Runner detects nearby runners for proximity encounters.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Runner reads workouts and heart rate to coach you mid-run.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Runner saves your finished runs to Health.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>

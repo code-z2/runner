@@ -1,1 +1,4 @@
 RUNNER_ENV = beta
+CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements
+ASSOCIATED_DOMAIN = auth.example.invalid
+APP_ATTEST_ENVIRONMENT = production

@@ -14,4 +14,23 @@ nonisolated enum AppConstants {
 
   /// Bundle identifier prefix for the app and its extensions.
   static let bundlePrefix = "app.runner"
+
+  /// Associated domain host for the HTTPS auth callback. Placeholder that
+  /// fails closed until the real domain lands with production access.
+  static let associatedDomain = "auth.example.invalid"
+
+  /// Callback path on the associated domain.
+  static let authCallbackPath = "/auth/callback"
+
+  /// The full redirect URI handed to Auth0. HTTPS only, per the iOS 17.4+
+  /// session API — no custom scheme anywhere in the product.
+  static var authCallbackURL: URL {
+    URL(string: "https://\(associatedDomain)\(authCallbackPath)")!
+  }
+
+  /// Reserved for the production relayer submitter. Until it lands,
+  /// chain submission stays a seam and nothing posts here.
+  static var nearRelayURL: URL {
+    URL(string: AppEnvironment.current.apiBaseURL + "/v1/near/relay")!
+  }
 }

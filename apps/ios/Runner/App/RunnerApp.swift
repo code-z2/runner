@@ -7,12 +7,34 @@
 
 import SwiftUI
 
-/// Application entry. Shell only: feature views arrive with their build steps.
+/// Application entry. The composition root lives in `AppModel`; routing
+/// state lives in `RootNavigation`. No UI is built here beyond the
+/// launch shell — screens arrive with their features.
 @main
 struct RunnerApp: App {
+
+  @State
+  private var app = AppModel()
+
+  @State
+  private var navigation = RootNavigation()
+
   var body: some Scene {
     WindowGroup {
-      EmptyView()
+      RootView(app: app, navigation: navigation)
+        .onOpenURL { url in
+          Task {
+            guard app.callbacks.isAuthCallback(url) else { return }
+            do {
+              try await app.flow.completeCallback(url)
+            } catch {
+              app.audit.ceremonyFailed(String(describing: error))
+            }
+          }
+        }
+        .onChange(of: navigation.phase) { _, phase in
+          Task { await app.lifecycle.moved(to: phase) }
+        }
     }
   }
 }
