@@ -139,6 +139,15 @@ Assumption: simple single-spend allowance per activity. No daily budgets.
 - Wallet SDK: NEAR cross-chain intent wallet via NEAR SDK integration.
 - Lock contract: escrow on NEAR. Holds personal goal-lock funds only. Never mingled with community treasury.
 
+### 9a. RunnerAuth (AGREED)
+
+- Two identities, one box: Apple identity (Sign in with Apple → server-verified) for API auth; NEAR passkey session (item RunnerNear) for chain ops. Works without payments: NEAR session optional, Apple required.
+- Scopes: request fullName + email; both first-presentation-only, downstream treats them as optional. Never asks twice, never gates on them.
+- Nonce: 32 random bytes; SHA-256 hex goes in the request, server verifies the same hash in the token.
+- Keychain: `whenUnlockedThisDeviceOnly`, no iCloud sync, access-group constant reserved for the Watch app, silent (no biometry) for session tokens. Single `runner.account.v1` blob, atomic.
+- Presentation stays app-layer (anchor + modern `init(url:callback:)` with `.https`): the package exposes request values, token parsing/validation, session store, coordinator. No UIKit, no Auth0.swift dependency.
+- Chain signing programs against RunnerNear's `NearSigner`; day-3 local-key fallback lands as a `LocalKeySigner` on the same protocol with no app-layer changes.
+
 ## 10. Goals + goal-lock escrow + full audio + run reports (AGREED)
 
 - Goals logic: user specifies amount to lock and agrees. Funds move from personal wallet to escrow on agreement.

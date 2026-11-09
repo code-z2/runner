@@ -2,12 +2,22 @@
 //  RunnerAuth.swift
 //  RunnerAuth
 //
-//  Created by Peter on 07/11/2026.
+//  Created by Peter on 09/11/2026.
 //
 
-/// Wallet entry: Apple social login mapped to the runner's NEAR account.
-///
-/// Agreed spec: `design/ORDER.md` §4 + §9 (F11, wallet stack).
-/// No seed phrase. Same address across sessions. Required only at wallet entry,
-/// never for running.
-public enum RunnerAuth {}
+/// Runner identity: Apple sign-in for API auth, NEAR passkey session for
+/// chain ops. Presentation stays app-layer; this box owns request values,
+/// token parsing/validation, the Keychain session, and the coordinator.
+/// Chain signing programs against RunnerNear's `NearSigner`.
+public struct RunnerAuth {
+
+  /// Keychain service namespace. One blob, atomic.
+  public static let service = "app.runner.auth"
+
+  /// Persisted account key. Versioned so rotation never collides.
+  public static let accountKey = "runner.account.v1"
+
+  /// Keychain access group for future Watch sharing. Reserved, unused
+  /// until the Watch app target exists.
+  public static let accessGroup = "group.app.runner.auth"
+}
