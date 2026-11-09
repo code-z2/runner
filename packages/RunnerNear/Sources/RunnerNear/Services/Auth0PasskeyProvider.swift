@@ -144,19 +144,39 @@ public actor Auth0PasskeyProvider: PasskeyProvider {
 
   public nonisolated func fatxnPayload(jwt: String) throws -> Data {
     let claims = try jwtClaims(jwt)
-    guard let fatxn = claims["fatxn"] as? [String: Any] else {
+    guard let fatxn = claims["fatxn"] else {
       throw NearError.loginFailed("JWT carries no fatxn claim")
     }
-    // One of transaction / delegateAction / nep413, as byte arrays.
-    for key in ["transaction", "delegateAction", "nep413"] {
-      if let numbers = fatxn[key] as? [Int] {
-        return Data(numbers.compactMap { UInt8(exactly: $0) })
-      }
-      if let numbers = fatxn[key] as? [NSNumber] {
-        return Data(numbers.compactMap { UInt8(exactly: $0.uint8Value) })
+    // The tenant binds the raw payload bytes as a bare number array
+    // (`setCustomClaim("fatxn", values)`). A keyed object is also accepted
+    // for tolerance; anything else fails closed.
+    if let numbers = fatxn as? [Int] {
+      return try bytes(of: numbers.map { NSNumber(value: $0) })
+    }
+    if let numbers = fatxn as? [NSNumber] {
+      return try bytes(of: numbers)
+    }
+    if let keyed = fatxn as? [String: Any] {
+      for key in ["transaction", "delegateAction", "nep413"] {
+        if let numbers = keyed[key] as? [Int] {
+          return try bytes(of: numbers.map { NSNumber(value: $0) })
+        }
+        if let numbers = keyed[key] as? [NSNumber] {
+          return try bytes(of: numbers)
+        }
       }
     }
     throw NearError.loginFailed("fatxn carries no payload")
+  }
+
+  private nonisolated func bytes(of numbers: [NSNumber]) throws -> Data {
+    let bytes = numbers.map { $0.uint8Value }
+    guard bytes.count == numbers.count,
+      numbers.allSatisfy({ $0.intValue >= 0 && $0.intValue <= 255 })
+    else {
+      throw NearError.loginFailed("fatxn carries no payload")
+    }
+    return Data(bytes)
   }
 
   // MARK: - Plumbing

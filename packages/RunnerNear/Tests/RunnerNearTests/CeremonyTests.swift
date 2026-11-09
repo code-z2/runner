@@ -58,6 +58,23 @@ struct CeremonyTests {
   }
 
   @Test
+  func fatxnDecodesBareArray() throws {
+    // Tenant reality: `setCustomClaim("fatxn", values)` binds the raw
+    // payload bytes as a bare number array.
+    let token = jwt(payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":[1,2,250]}"#)
+    let bytes = try provider().fatxnPayload(jwt: token)
+    #expect(Array(bytes) == [1, 2, 250])
+  }
+
+  @Test
+  func fatxnRejectsOutOfRangeBytes() throws {
+    let token = jwt(payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":[1,300]}"#)
+    #expect(throws: NearError.self) {
+      try provider().fatxnPayload(jwt: token)
+    }
+  }
+
+  @Test
   func fatxnMissingFailsClosed() throws {
     let token = jwt(payload: #"{"sub":"auth0|abc","exp":9999999999}"#)
     #expect(throws: NearError.self) {
@@ -75,7 +92,7 @@ struct CeremonyTests {
       transport: transport
     )
     let token = jwt(
-      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":{"transaction":[1,2,250]}}"#)
+      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":[1,2,250]}"#)
     await transport.enqueue(
       json: #"{"access_token":"\#(token)","token_type":"Bearer","expires_in":60}"#)
     let out = try await provider.completeSignatureCallback(
@@ -95,7 +112,7 @@ struct CeremonyTests {
       transport: transport
     )
     let token = jwt(
-      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":{"transaction":[1,2,250]}}"#)
+      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":[1,2,250]}"#)
     await transport.enqueue(
       json: #"{"access_token":"\#(token)","token_type":"Bearer","expires_in":60}"#)
     await #expect(throws: NearError.self) {
