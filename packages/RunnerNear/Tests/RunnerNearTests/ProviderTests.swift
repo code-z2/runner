@@ -53,7 +53,9 @@ struct ProviderTests {
       query.first(where: { $0.name == name })?.value
     }
     #expect(value("client_id") == "np8paqIpMWmNbzT4xAvOOapZBjsOpptl")
-    #expect(value("audience") == "auth0.jwt.fast-auth.testnet")
+    // Plain login must not request the signing audience: the tenant denies
+    // audience-without-payload, and a session login carries none.
+    #expect(value("audience") == nil)
     #expect(value("code_challenge_method") == "S256")
     #expect(value("redirect_uri") == "runner://auth")
   }

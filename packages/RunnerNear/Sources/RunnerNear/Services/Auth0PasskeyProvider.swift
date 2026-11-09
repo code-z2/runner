@@ -41,8 +41,10 @@ public actor Auth0PasskeyProvider: PasskeyProvider {
       URLQueryItem(name: "response_type", value: "code"),
       URLQueryItem(name: "client_id", value: network.authClientID),
       URLQueryItem(name: "redirect_uri", value: redirectURI),
+      // No audience: plain login must not request the signing audience —
+      // the tenant denies audience-without-payload, and a session login
+      // carries no signing payload by design.
       URLQueryItem(name: "scope", value: "openid profile email offline_access"),
-      URLQueryItem(name: "audience", value: network.signingAudience),
       URLQueryItem(name: "state", value: state),
       URLQueryItem(name: "code_challenge", value: codeChallenge),
       URLQueryItem(name: "code_challenge_method", value: "S256"),
@@ -104,11 +106,14 @@ public actor Auth0PasskeyProvider: PasskeyProvider {
       URLQueryItem(name: "state", value: state),
       URLQueryItem(name: "code_challenge", value: codeChallenge),
       URLQueryItem(name: "code_challenge_method", value: "S256"),
-      // The payload rides as a login parameter; NEAR's Auth0 Action binds
-      // it into the JWT's `fatxn` claim. Base64 keeps it URL-safe. The exact
-      // parameter shape is verified live on testnet before production use —
-      // `completeSignatureCallback` refuses any JWT whose fatxn disagrees.
-      URLQueryItem(name: payload.parameterName, value: payload.bytes.base64EncodedString()),
+      // The payload rides as a login parameter, comma-joined bytes exactly
+      // like the JS/RN providers (`number[].toString()`); NEAR's Auth0
+      // Action splits on "," and denies anything else. The Action binds it
+      // into the JWT's `fatxn` claim — `completeSignatureCallback` refuses
+      // any JWT whose fatxn disagrees.
+      URLQueryItem(
+        name: payload.parameterName,
+        value: payload.bytes.map { String($0) }.joined(separator: ",")),
     ]
     guard let url = components.url else {
       throw NearError.invalidInput("unbuildable signature URL")

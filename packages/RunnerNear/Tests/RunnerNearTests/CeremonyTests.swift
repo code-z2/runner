@@ -45,7 +45,9 @@ struct CeremonyTests {
     }
     #expect(value("scope") == "transaction:sign")
     #expect(value("audience") == "auth0.jwt.fast-auth.testnet")
-    #expect(value("nep413") == payload.base64EncodedString())
+    // Comma-joined bytes, exactly like the JS/RN providers: the tenant
+    // Action splits the parameter on "," and denies anything else.
+    #expect(value("nep413") == "1,2,3,250")
   }
 
   @Test
