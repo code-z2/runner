@@ -24,11 +24,17 @@ struct RunnerApp: App {
       RootView(app: app, navigation: navigation)
         .onOpenURL { url in
           Task {
-            guard app.callbacks.isAuthCallback(url) else { return }
-            do {
-              try await app.flow.completeCallback(url)
-            } catch {
-              app.audit.ceremonyFailed(String(describing: error))
+            if app.callbacks.isAuthCallback(url) {
+              do {
+                try await app.flow.completeCallback(url)
+              } catch {
+                app.audit.ceremonyFailed(String(describing: error))
+              }
+              return
+            }
+            if let link = AppLinkRoute(url: url, host: AppConstants.associatedDomain) {
+              let route = link.route
+              await MainActor.run { navigation.route = route }
             }
           }
         }

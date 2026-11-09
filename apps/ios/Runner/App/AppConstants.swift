@@ -15,9 +15,10 @@ nonisolated enum AppConstants {
   /// Bundle identifier prefix for the app and its extensions.
   static let bundlePrefix = "app.runner"
 
-  /// Associated domain host for the HTTPS auth callback. Placeholder that
-  /// fails closed until the real domain lands with production access.
-  static let associatedDomain = "auth.example.invalid"
+  /// Associated domain host for HTTPS callbacks and universal links.
+  /// Served with the `apple-app-site-association` file; every URL under
+  /// it that is not an allowlisted app route stays in Safari.
+  static let associatedDomain = "ije.wades.io"
 
   /// Callback path on the associated domain.
   static let authCallbackPath = "/auth/callback"

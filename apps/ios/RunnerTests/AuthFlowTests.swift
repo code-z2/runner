@@ -58,7 +58,7 @@ struct AuthFlowTests {
     let flow = AuthFlow(
       provider: provider,
       coordinator: auth,
-      redirectURI: "https://auth.example.invalid/auth/callback",
+      redirectURI: "https://ije.wades.io/auth/callback",
       appleAudience: "app.runner",
       resolveAccount: resolve)
     return (flow, auth, transport)
@@ -106,7 +106,7 @@ struct AuthFlowTests {
     #expect(url.host == "login.testnet.fast-auth.com")
     let callback = URL(
       string:
-        "https://auth.example.invalid/auth/callback?code=c&state=\(state(of: url))"
+        "https://ije.wades.io/auth/callback?code=c&state=\(state(of: url))"
     )!
     let session = try await flow.completeLoginCallback(callback)
     #expect(session.subject == "auth0|abc")
@@ -118,7 +118,7 @@ struct AuthFlowTests {
   func loginStateMismatchFails() async throws {
     let (flow, _, _) = flow()
     _ = try await flow.beginLogin()
-    let callback = URL(string: "https://auth.example.invalid/auth/callback?code=c&state=tampered")!
+    let callback = URL(string: "https://ije.wades.io/auth/callback?code=c&state=tampered")!
     await #expect(throws: AuthCallbackError.self) {
       try await flow.completeLoginCallback(callback)
     }
@@ -136,7 +136,7 @@ struct AuthFlowTests {
     #expect(url.absoluteString.contains("transaction=1,2"))
     let callback = URL(
       string:
-        "https://auth.example.invalid/auth/callback?code=c&state=\(state(of: url))"
+        "https://ije.wades.io/auth/callback?code=c&state=\(state(of: url))"
     )!
     let account = try await flow.completeSignatureCallback(callback)
     #expect(account.accountID == "a.near")

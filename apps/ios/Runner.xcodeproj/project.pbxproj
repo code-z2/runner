@@ -528,9 +528,19 @@
 			path = SessionLifecycleTests.swift;
 			sourceTree = "<group>";
 		};
+		2000000000000000000000190 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AppLinkRouteTests.swift;
+			sourceTree = "<group>";
+		};
 		2000000000000000000000156 = {
 			isa = PBXBuildFile;
 			fileRef = 2000000000000000000000146;
+		};
+		2000000000000000000000191 = {
+			isa = PBXBuildFile;
+			fileRef = 2000000000000000000000190;
 		};
 		2000000000000000000000180 = {
 			isa = PBXBuildFile;
@@ -638,6 +648,7 @@
 				2000000000000000000000154,
 				2000000000000000000000155,
 				2000000000000000000000156,
+				2000000000000000000000191,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -773,6 +784,7 @@
 				2000000000000000000000144,
 				2000000000000000000000145,
 				2000000000000000000000146,
+				2000000000000000000000190,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
