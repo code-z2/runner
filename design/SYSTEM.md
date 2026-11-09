@@ -276,3 +276,23 @@ Living record of what was built. Update on every completed item.
 - Gaps: interactive passkey login + `sign` submission + account
   funding/key-permission proof need a device (JWT-gated, can't run
   headless); production submitter (server relayer) is a later step
+
+## 2026-11-09 - iOS UI design (Figma)
+
+- Item: zero-functionality UI for the iOS app
+- What it is: Figma file https://www.figma.com/design/3pOXDAoe1amTH89MBf2ymP with
+  12 screens (ready, countdown, live, summary with claim pass, history, places,
+  claim amount, claim done, wallet with goal lock and pool, PacePilot opt-in,
+  fund the pool, lock a goal), local tokens (12 colors, radii, spacing) and
+  components (button, chip, stat, tab bar, status bar, toggle, start button,
+  live pulse, beat, countdown)
+- How it was done: built through the Figma plugin API; looping motion with
+  Smart Animate between component variants (start breathes, live dot pulses,
+  beat dots tick at running cadence, countdown 3-2-1, toggle slides); click-
+  through prototype with flows "Run and claim" and "Wallet, goals and pool"
+- Why this way: Peter asked for UI first with no functionality, polished and
+  motion focused; dark premium look from his reference sites
+- Importance: visual target for the SwiftUI screens
+- Metadata: Inter stands in for SF Pro in Figma (SF Pro is not installed on the
+  Windows design machine); the app should use the system font; headings use
+  Instrument Serif (OFL); 2026-11-09

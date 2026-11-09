@@ -168,3 +168,12 @@ Assumption: Peter handed the lead and all open decisions to Joel on 2026-11-08. 
 - Merchant sign-in: email link via Resend.
 - Admin approval holds no DAO key: the DAO proposal passes first, the server checks the contract, then shows the merchant.
 - Stack: Cloudflare Workers + D1, TypeScript, bun.
+
+## 13. Money model and coach opt-in (AGREED)
+
+Assumption: Peter's call on 2026-11-09, Joel leads.
+
+- No private balance in the app. Money lives in two places only: the DAO community treasury (2-of-N claims, item 8) and each runner's personal goal escrow.
+- Anyone can fund the treasury from any chain through NEAR Intents. The swap delivers the treasury token to the treasury contract; no app balance in between.
+- Goal escrow: the runner locks their own money on a goal. A later run that beats it unlocks the money, which stays in the same escrow contract until the runner moves it out. Give up any time: half back, half to the pool (item 10).
+- PacePilot is opt-in only. Off by default; the live coach card shows only when it is on.
