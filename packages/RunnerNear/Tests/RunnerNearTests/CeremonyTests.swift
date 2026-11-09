@@ -66,6 +66,66 @@ struct CeremonyTests {
   }
 
   @Test
+  func signatureCallbackAcceptsAccessToken() async throws {
+    // The signing-audience exchange returns the JWT as `access_token`
+    // (no `id_token`); the kept token must be the access token.
+    let transport = MockAuthTransport()
+    let provider = Auth0PasskeyProvider(
+      network: NearNetwork.testnet(relayerURL: URL(string: "https://relayer.test")!),
+      transport: transport
+    )
+    let token = jwt(
+      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":{"transaction":[1,2,250]}}"#)
+    await transport.enqueue(
+      json: #"{"access_token":"\#(token)","token_type":"Bearer","expires_in":60}"#)
+    let out = try await provider.completeSignatureCallback(
+      URL(string: "http://localhost:3000/?code=c&state=s")!,
+      codeVerifier: "v",
+      redirectURI: "http://localhost:3000",
+      expectedPayloadHex: "0102fa"
+    )
+    #expect(out == token)
+  }
+
+  @Test
+  func signatureCallbackFatxnMismatchFails() async throws {
+    let transport = MockAuthTransport()
+    let provider = Auth0PasskeyProvider(
+      network: NearNetwork.testnet(relayerURL: URL(string: "https://relayer.test")!),
+      transport: transport
+    )
+    let token = jwt(
+      payload: #"{"sub":"auth0|abc","exp":9999999999,"fatxn":{"transaction":[1,2,250]}}"#)
+    await transport.enqueue(
+      json: #"{"access_token":"\#(token)","token_type":"Bearer","expires_in":60}"#)
+    await #expect(throws: NearError.self) {
+      try await provider.completeSignatureCallback(
+        URL(string: "http://localhost:3000/?code=c&state=s")!,
+        codeVerifier: "v",
+        redirectURI: "http://localhost:3000",
+        expectedPayloadHex: "0102ff"
+      )
+    }
+  }
+
+  @Test
+  func tokenResponseWithoutEitherTokenFails() async throws {
+    let transport = MockAuthTransport()
+    let provider = Auth0PasskeyProvider(
+      network: NearNetwork.testnet(relayerURL: URL(string: "https://relayer.test")!),
+      transport: transport
+    )
+    await transport.enqueue(json: #"{"token_type":"Bearer","expires_in":60}"#)
+    await #expect(throws: NearError.self) {
+      try await provider.completeLogin(
+        callbackURL: URL(string: "http://localhost:3000/?code=c&state=s")!,
+        codeVerifier: "v",
+        redirectURI: "http://localhost:3000"
+      )
+    }
+  }
+
+  @Test
   func derivationPathFormat() {
     #expect(
       MpcAccountResolver.derivationPath(

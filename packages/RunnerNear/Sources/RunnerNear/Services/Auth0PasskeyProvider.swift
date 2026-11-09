@@ -209,11 +209,13 @@ public actor Auth0PasskeyProvider: PasskeyProvider {
 
   private func decodeSession(_ data: Data) throws -> PasskeySession {
     struct TokenResponse: Decodable {
-      let idToken: String
+      let idToken: String?
+      let accessToken: String?
       let refreshToken: String?
       let expiresIn: Int
       private enum CodingKeys: String, CodingKey {
         case idToken = "id_token"
+        case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
       }
@@ -224,14 +226,20 @@ public actor Auth0PasskeyProvider: PasskeyProvider {
     } catch {
       throw NearError.loginFailed("unreadable token response")
     }
-    let claims = try jwtClaims(decoded.idToken)
+    // Session login returns an id_token; a signing-audience exchange
+    // returns the JWT as the access token instead (mirrors RN's
+    // `idToken ?? accessToken`). Either way the kept token is the JWT.
+    guard let token = decoded.idToken ?? decoded.accessToken else {
+      throw NearError.loginFailed("unreadable token response")
+    }
+    let claims = try jwtClaims(token)
     guard let subject = claims["sub"] as? String, !subject.isEmpty,
       let expiry = claims["exp"] as? Int
     else {
       throw NearError.loginFailed("id token carries no sub/exp")
     }
     return PasskeySession(
-      idToken: decoded.idToken,
+      idToken: token,
       refreshToken: decoded.refreshToken,
       expiresAt: Date(timeIntervalSince1970: TimeInterval(expiry)),
       subject: subject
