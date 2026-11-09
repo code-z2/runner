@@ -102,6 +102,10 @@ Out `201`:
 }
 ```
 
+The same response also carries `run_proof` and `run_proof_signature`: the attestor's signature over
+`{"v":1,"kind":"run","account_id","activity_hash","started_at","ended_at","distance_m","active_seconds"}`.
+The goal escrow uses it to unlock a goal.
+
 - `max_amount_cents` = min(500, floor(distance_m / 20)).
 - `expires_at` = now + 2 hours.
 - Fails: `400` bad input, `401` signature or device check fails, `409` overlapping or too soon, `422` not eligible with a reason: `too_short`, `bad_splits`, `pace_out_of_range`, `cadence_out_of_range`, `too_many_pauses`, `too_old`, `in_future`.
@@ -199,3 +203,20 @@ Before go-live:
 - The contract account must be registered with the token contract (`storage_deposit`).
 - Each merchant must also be registered with the token contract before `add_merchant`. If not, transfers to them fail and the pass is freed.
 - The contract needs a NEAR balance for storage. Each used pass keeps a 32-byte record.
+
+## Goal escrow contract (`contracts/escrow`)
+
+NEAR contract, near-sdk 5.30.1, same build image as the treasury. Holds runners' own money locked on goals. No private balance anywhere else (ORDER item 13).
+
+Setup: `new(owner_id, token_id, treasury_id, attestor_public_key, min_lock)`.
+
+- Lock: send the token with `ft_transfer_call` and `msg` = `{"distance_m":10000,"max_seconds":3300}` (`max_seconds` optional). Below `min_lock`, a bad goal or another token is refunded.
+- Goals: 1,000 to 100,000 m, and 60 s to 24 h when timed.
+- `unlock(lock_id, proof, signature)`: by the lock owner, with a run proof from the server. The run must start after the lock was made, cover the distance, and beat the time at its average pace. The money moves to the owner's unlocked balance in the escrow.
+- `give_up(lock_id)`: half to the owner's unlocked balance, half sent to the treasury. A failed pool transfer is kept as `pool_owed`; anyone can retry with `flush_pool()`.
+- `withdraw(amount, receiver_id?)`: moves unlocked money out. Restored if the transfer fails.
+- `lock_from_balance(amount, goal)`: lock unlocked money again.
+- `withdraw`, `give_up` and `lock_from_balance` need 1 yoctoNEAR attached, so only a full access key can move money.
+- Owner (DAO): `set_attestor`, `set_min_lock`, `set_owner`. No pause and no admin withdraw: runners can always take their unlocked money out.
+- Views: `get_lock`, `get_locks(account_id)`, `get_balance(account_id)`, `get_config()`.
+- No deadline and no automatic loss (item 10).

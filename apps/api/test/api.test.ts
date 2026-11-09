@@ -107,6 +107,16 @@ describe("runner flow", () => {
     expect(ed25519.verify(Buffer.from(body.signature, "base64"), utf8(body.attestation), attestorPublic)).toBe(true);
   });
 
+  test("also signs a run proof the goal escrow can check", async () => {
+    const run = activity(600);
+    const body = (await (await attest(run)).json()) as { run_proof: string; run_proof_signature: string };
+    const proof = JSON.parse(body.run_proof);
+    expect(Object.keys(proof)).toEqual(["v", "kind", "account_id", "activity_hash", "started_at", "ended_at", "distance_m", "active_seconds"]);
+    expect(proof).toMatchObject({ v: 1, kind: "run", account_id: "runner.near", distance_m: 5120, active_seconds: 1800, started_at: run.started_at });
+    const attestorPublic = ed25519.getPublicKey(Buffer.from(env.ATTESTOR_SECRET_KEY, "base64"));
+    expect(ed25519.verify(Buffer.from(body.run_proof_signature, "base64"), utf8(body.run_proof), attestorPublic)).toBe(true);
+  });
+
   test("refuses a second run within 4 hours", async () => {
     expect((await attest(activity(10000))).status).toBe(201);
     const second = await attest(activity(600));
