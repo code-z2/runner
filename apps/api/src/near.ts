@@ -74,13 +74,49 @@ async function rpcQuery(rpcUrl: string, params: Record<string, unknown>): Promis
   return body.result;
 }
 
-export async function isFullAccessKey(rpcUrl: string, accountId: string, publicKey: string): Promise<boolean> {
+export interface AccessKeyView {
+  nonce: bigint;
+  fullAccess: boolean;
+  blockHash: string;
+  blockHeight: bigint;
+}
+
+export async function viewAccessKey(rpcUrl: string, accountId: string, publicKey: string): Promise<AccessKeyView | null> {
   const result = await rpcQuery(rpcUrl, {
     request_type: "view_access_key",
     account_id: accountId,
     public_key: publicKey,
   });
-  return result?.permission === "FullAccess";
+  if (!result || result.nonce === undefined || typeof result.block_hash !== "string") {
+    return null;
+  }
+  return {
+    nonce: BigInt(result.nonce as number | string),
+    fullAccess: result.permission === "FullAccess",
+    blockHash: result.block_hash,
+    blockHeight: BigInt(result.block_height as number | string),
+  };
+}
+
+export async function isFullAccessKey(rpcUrl: string, accountId: string, publicKey: string): Promise<boolean> {
+  return (await viewAccessKey(rpcUrl, accountId, publicKey))?.fullAccess === true;
+}
+
+export async function rpcCall(rpcUrl: string, method: string, params: unknown): Promise<{ result?: Record<string, unknown>; error?: Record<string, unknown> }> {
+  let response: Response;
+  try {
+    response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: "runner-api", method, params }),
+    });
+  } catch {
+    throw new HttpError(502, "near_rpc_unavailable");
+  }
+  if (!response.ok && response.status !== 400) {
+    throw new HttpError(502, "near_rpc_unavailable");
+  }
+  return (await response.json()) as { result?: Record<string, unknown>; error?: Record<string, unknown> };
 }
 
 export async function isRegisteredMerchant(rpcUrl: string, contractId: string, merchantId: string): Promise<boolean> {
