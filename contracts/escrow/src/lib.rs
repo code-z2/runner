@@ -54,6 +54,7 @@ pub struct Config {
     pub owner_id: AccountId,
     pub token_id: AccountId,
     pub treasury_id: AccountId,
+    pub pool_id: AccountId,
     pub min_lock: U128,
     pub pool_owed: U128,
 }
@@ -91,6 +92,7 @@ pub struct Escrow {
     owner_id: AccountId,
     token_id: AccountId,
     treasury_id: AccountId,
+    pool_id: AccountId,
     min_lock: u128,
     next_lock_id: u64,
     pool_owed: u128,
@@ -130,6 +132,7 @@ impl Escrow {
         owner_id: AccountId,
         token_id: AccountId,
         treasury_id: AccountId,
+        pool_id: AccountId,
         min_lock: U128,
     ) -> Self {
         require!(min_lock.0 > 0, "min_lock must be positive");
@@ -137,6 +140,7 @@ impl Escrow {
             owner_id,
             token_id,
             treasury_id,
+            pool_id,
             min_lock: min_lock.0,
             next_lock_id: 0,
             pool_owed: 0,
@@ -313,6 +317,7 @@ impl Escrow {
             owner_id: self.owner_id.clone(),
             token_id: self.token_id.clone(),
             treasury_id: self.treasury_id.clone(),
+            pool_id: self.pool_id.clone(),
             min_lock: U128(self.min_lock),
             pool_owed: U128(self.pool_owed),
         }
@@ -379,7 +384,7 @@ impl Escrow {
         ext_ft::ext(self.token_id.clone())
             .with_attached_deposit(ONE_YOCTO)
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(self.treasury_id.clone(), U128(amount), Some("goal given up".to_string()))
+            .ft_transfer(self.pool_id.clone(), U128(amount), Some("goal given up".to_string()))
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE)
