@@ -133,6 +133,17 @@ Assumption: simple single-spend allowance per activity. No daily budgets.
 
 ---
 
+## 8a. Runner-governed DAO (AGREED 2026-11-10)
+
+Amends item 8's admin shape. The pool belongs to the runners: every claiming runner is a DAO member and governs policy. Founders keep break-glass only.
+
+- Auto-join on claim: the first successful claim also adds the runner to the `community` role. The claims module proposes `AddMemberToRole` (bond from the module balance); membership follows participation, no human votes per join. Escrow-only users are not members until they claim — two shapes, claim joins, lock doesn't.
+- `community` role: all claiming runners. Votes on policy kinds only — merchants, attestor rotation, pool parameters, thresholds. Never direct transfers; money moves only through automatic claims.
+- `council` role (Peter + Joel, unanimous [2,2]): break-glass only — pause the claims module on exploit, and `RemoveProposal` reversal of a community proposal inside its voting window. No policy votes, no transfers.
+- Timelock is the voting window: community policy proposals carry a long `proposal_period` (genesis 7 days, community-amendable). The council may remove a proposal inside the window, on-chain and visible. After finalization it executes immediately — there is no second timelock contract.
+- Genesis thresholds (community-ratifiable later): policy kinds pass on majority of votes cast with a 5% quorum of the role. Transfers stay module-only; council keeps no transfer power.
+- Joel translates this to the Sputnik policy JSON and extends the claims module (membership proposals + bond budget). Until then item 8's council policy stands.
+
 ## 9. Wallet stack (AGREED)
 
 - OAuth: Apple only for now. NEAR social login; builds on item 4.
