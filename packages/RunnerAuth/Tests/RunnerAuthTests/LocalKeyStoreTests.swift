@@ -5,6 +5,7 @@
 //  Created by Peter on 10/11/2026.
 //
 
+import Foundation
 import RunnerAuthTesting
 import RunnerNearTesting
 import Testing
@@ -60,6 +61,49 @@ struct LocalKeyStoreTests {
     await core.scriptAccountID("cafe.near")
     let rotated = try await keys.account()
     #expect(rotated.account.accountID == "cafe.near")
+  }
+
+  @Test
+  func legacyBlobSecretMigratesToTheGatedItem() async throws {
+    let memory = MemoryStore()
+    let core = MockNearCore()
+    let coordinator = RunnerAuthCoordinator(store: memory)
+    try await coordinator.linkApple(apple())
+    let legacy = PersistedAccount(
+      appleUserID: "u", email: nil, givenName: nil, familyName: nil, appleToken: nil,
+      serverSession: nil, nearSubject: nil, nearAccountID: nil, nearPublicKey: nil, nearToken: nil,
+      nearLocalSecret: "c2VjcmV0", nearLocalPublicKey: "ed25519:abc", nearLocalAccountID: nil)
+    try await memory.save(JSONEncoder().encode(legacy), forKey: RunnerAuth.accountKey)
+    await core.scriptAccountID("deadbeef.near")
+
+    let keys = LocalKeyStore(store: memory, core: core)
+    let migrated = try await keys.account()
+    #expect(migrated.account.accountID == "deadbeef.near")
+    #expect(migrated.secretBase64 == "c2VjcmV0")
+
+    let data = try #require(await memory.load(forKey: RunnerAuth.accountKey))
+    let blob = try JSONDecoder().decode(PersistedAccount.self, from: data)
+    #expect(blob.nearLocalSecret == nil)
+    #expect(blob.nearLocalPublicKey == "ed25519:abc")
+    #expect(try await memory.load(forKey: RunnerAuth.localKey) == Data(base64Encoded: "c2VjcmV0"))
+    // Second touch reuses the gated item without regenerating.
+    await core.scriptKeypair(NearKeypair(secretBase64: "bmV3", publicKey: "ed25519:changed"))
+    #expect(try await keys.account().account.accountID == "deadbeef.near")
+  }
+
+  @Test
+  func freshSecretNeverLandsInTheBlob() async throws {
+    let memory = MemoryStore()
+    let core = MockNearCore()
+    let coordinator = RunnerAuthCoordinator(store: memory)
+    try await coordinator.linkApple(apple())
+    await core.scriptKeypair(NearKeypair(secretBase64: "c2VjcmV0", publicKey: "ed25519:abc"))
+    await core.scriptAccountID("deadbeef.near")
+    _ = try await LocalKeyStore(store: memory, core: core).account()
+    let data = try #require(await memory.load(forKey: RunnerAuth.accountKey))
+    let blob = try JSONDecoder().decode(PersistedAccount.self, from: data)
+    #expect(blob.nearLocalSecret == nil)
+    #expect(try await memory.load(forKey: RunnerAuth.localKey) == Data(base64Encoded: "c2VjcmV0"))
   }
 
   @Test

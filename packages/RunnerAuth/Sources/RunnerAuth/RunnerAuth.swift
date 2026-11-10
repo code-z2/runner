@@ -17,6 +17,11 @@ public struct RunnerAuth {
   /// Persisted account key. Versioned so rotation never collides.
   public static let accountKey = "runner.account.v1"
 
+  /// Device-key secret. Separate item so only key material carries the
+  /// biometric gate; identity fields stay silent in the account blob.
+  /// Versioned alongside the blob it belongs to.
+  public static let localKey = "runner.localkey.v1"
+
   /// Keychain access group for future Watch sharing. Reserved, unused
   /// until the Watch app target exists.
   public static let accessGroup = "group.app.runner.auth"

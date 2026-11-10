@@ -29,4 +29,14 @@ struct KeychainStoreTests {
     try await store.delete(forKey: "k")
     #expect(try await store.load(forKey: "k") == nil)
   }
+
+  @Test
+  func biometricSaveReplacesTheGate() async throws {
+    // No load here: reading a gated item prompts for Face ID / Touch ID,
+    // which only a hardware smoke run can exercise.
+    let store = store()
+    try await store.save(Data("v".utf8), forKey: "k", biometry: true)
+    try await store.save(Data("v2".utf8), forKey: "k", biometry: true)
+    try await store.delete(forKey: "k")
+  }
 }

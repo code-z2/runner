@@ -9,8 +9,8 @@ import Foundation
 import Security
 
 /// Live Keychain store. Device-only, never synced, readable only while
-/// the device is unlocked. Biometrics deliberately absent: session tokens
-/// must load silently on launch and in the background.
+/// the device is unlocked. Session blobs stay silent for launch and
+/// background loads; key material opts into the biometric gate per save.
 public struct KeychainStore: SecureStore, Sendable {
 
   private let service: String
@@ -40,6 +40,37 @@ public struct KeychainStore: SecureStore, Sendable {
       let update: [String: Any] = [kSecValueData as String: data]
       let updateStatus = SecItemUpdate(query(forKey: key) as CFDictionary, update as CFDictionary)
       guard updateStatus == errSecSuccess else { throw AuthError.keychain(updateStatus) }
+      return
+    }
+    guard status == errSecSuccess else { throw AuthError.keychain(status) }
+  }
+
+  /// Biometric-gated save. Every read prompts Face ID / Touch ID.
+  /// Access control carries its own accessibility, so `kSecAttrAccessible`
+  /// must not be set alongside it; changing the gate means delete + add,
+  /// never update.
+  public func save(_ data: Data, forKey key: String, biometry: Bool) throws {
+    guard biometry else { return try save(data, forKey: key) }
+    var accessError: Unmanaged<CFError>?
+    guard
+      let accessControl = SecAccessControlCreateWithFlags(
+        nil,
+        kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        .biometryAny,
+        &accessError
+      )
+    else {
+      accessError?.release()
+      throw AuthError.keychain(errSecParam)
+    }
+    var attributes = query(forKey: key)
+    attributes[kSecValueData as String] = data
+    attributes[kSecAttrAccessControl as String] = accessControl
+    let status = SecItemAdd(attributes as CFDictionary, nil)
+    if status == errSecDuplicateItem {
+      try delete(forKey: key)
+      let retryStatus = SecItemAdd(attributes as CFDictionary, nil)
+      guard retryStatus == errSecSuccess else { throw AuthError.keychain(retryStatus) }
       return
     }
     guard status == errSecSuccess else { throw AuthError.keychain(status) }

@@ -351,8 +351,7 @@ Living record of what was built. Update on every completed item.
 - Metadata: packages/RunnerAuth (RunnerAuth, RunnerAuthTesting); first
   inter-package dependency (`../RunnerNear`); iOS 26 + macOS 15; 2026-11-09
 - Gaps: `credentialState` launch check + controller presentation live in
-  the app layer; server SIWA verification is Joel’s side; biometric gate
-  deferred (silent Keychain unless asked)
+  the app layer; no server SIWA verification exists or is planned — the server trusts App Attest + key ownership only; biometric gate on the device-key item (sessions stay silent)
 
 ## 2026-11-09 - iOS UI design (Figma)
 
