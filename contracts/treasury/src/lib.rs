@@ -6,9 +6,10 @@ use near_sdk::{
     PanicOnDefault, Promise, PromiseError, PromiseOrValue, PublicKey,
 };
 
-const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
+const GAS_FOR_ADD_PROPOSAL: Gas = Gas::from_tgas(20);
+const GAS_FOR_APPROVE_STEP: Gas = Gas::from_tgas(95);
+const GAS_FOR_ACT_PROPOSAL: Gas = Gas::from_tgas(70);
 const GAS_FOR_RESOLVE: Gas = Gas::from_tgas(10);
-const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 
 #[near(serializers = [borsh])]
@@ -21,10 +22,11 @@ enum StorageKey {
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Treasury {
-    owner_id: AccountId,
+    dao_id: AccountId,
     token_id: AccountId,
     attestor_public_key: [u8; 32],
     units_per_cent: u128,
+    proposal_bond: u128,
     paused: bool,
     merchants: LookupSet<AccountId>,
     used_nonces: LookupSet<[u8; 32]>,
@@ -44,17 +46,41 @@ struct ClaimPass {
 
 #[near(serializers = [json])]
 pub struct Config {
-    pub owner_id: AccountId,
+    pub dao_id: AccountId,
     pub token_id: AccountId,
     pub attestor_public_key: PublicKey,
     pub units_per_cent: U128,
+    pub proposal_bond: U128,
     pub paused: bool,
 }
 
-#[ext_contract(ext_ft)]
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProposalKind {
+    Transfer {
+        token_id: String,
+        receiver_id: AccountId,
+        amount: U128,
+        msg: Option<String>,
+    },
+}
+
+#[near(serializers = [json])]
+pub struct ProposalInput {
+    pub description: String,
+    pub kind: ProposalKind,
+}
+
+#[near(serializers = [json])]
+pub enum Action {
+    VoteApprove,
+}
+
+#[ext_contract(ext_dao)]
 #[allow(dead_code)]
-trait FungibleToken {
-    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+trait SputnikDao {
+    fn add_proposal(&mut self, proposal: ProposalInput) -> u64;
+    fn act_proposal(&mut self, id: u64, action: Action, proposal: ProposalKind, memo: Option<String>);
 }
 
 fn ed25519_key(public_key: &PublicKey) -> [u8; 32] {
@@ -78,13 +104,20 @@ fn parse_nonce(hex: &str) -> [u8; 32] {
 #[near]
 impl Treasury {
     #[init]
-    pub fn new(owner_id: AccountId, token_id: AccountId, attestor_public_key: PublicKey, units_per_cent: U128) -> Self {
+    pub fn new(
+        dao_id: AccountId,
+        token_id: AccountId,
+        attestor_public_key: PublicKey,
+        units_per_cent: U128,
+        proposal_bond: U128,
+    ) -> Self {
         require!(units_per_cent.0 > 0, "units_per_cent must be positive");
         Self {
-            owner_id,
+            dao_id,
             token_id,
             attestor_public_key: ed25519_key(&attestor_public_key),
             units_per_cent: units_per_cent.0,
+            proposal_bond: proposal_bond.0,
             paused: false,
             merchants: LookupSet::new(StorageKey::Merchants),
             used_nonces: LookupSet::new(StorageKey::UsedNonces),
@@ -123,72 +156,106 @@ impl Treasury {
             .checked_mul(self.units_per_cent)
             .unwrap_or_else(|| env::panic_str("amount overflow"));
 
-        ext_ft::ext(self.token_id.clone())
-            .with_attached_deposit(ONE_YOCTO)
-            .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(merchant_id, U128(amount), None)
+        let kind = ProposalKind::Transfer {
+            token_id: self.token_id.to_string(),
+            receiver_id: merchant_id,
+            amount: U128(amount),
+            msg: None,
+        };
+        ext_dao::ext(self.dao_id.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(self.proposal_bond))
+            .with_static_gas(GAS_FOR_ADD_PROPOSAL)
+            .add_proposal(ProposalInput {
+                description: format!("runner claim {}", pass.nonce),
+                kind: kind.clone(),
+            })
             .then(
                 Self::ext(env::current_account_id())
-                    .with_static_gas(GAS_FOR_RESOLVE)
-                    .on_claim_resolved(pass.nonce),
+                    .with_static_gas(GAS_FOR_APPROVE_STEP)
+                    .on_proposal_added(pass.nonce, kind),
             )
     }
 
     #[private]
-    pub fn on_claim_resolved(&mut self, nonce: String, #[callback_result] result: Result<(), PromiseError>) -> bool {
-        if result.is_ok() {
-            return true;
+    pub fn on_proposal_added(
+        &mut self,
+        nonce: String,
+        kind: ProposalKind,
+        #[callback_result] proposal_id: Result<u64, PromiseError>,
+    ) -> PromiseOrValue<bool> {
+        match proposal_id {
+            Err(_) => {
+                self.used_nonces.remove(&parse_nonce(&nonce));
+                env::log_str(&format!("claim {nonce} released: the DAO did not accept the payout proposal"));
+                PromiseOrValue::Value(false)
+            }
+            Ok(id) => PromiseOrValue::Promise(
+                ext_dao::ext(self.dao_id.clone())
+                    .with_static_gas(GAS_FOR_ACT_PROPOSAL)
+                    .act_proposal(id, Action::VoteApprove, kind, None)
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_FOR_RESOLVE)
+                            .on_proposal_approved(nonce, id),
+                    ),
+            ),
         }
-        self.used_nonces.remove(&parse_nonce(&nonce));
-        false
     }
 
-    pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        let _ = (sender_id, msg);
-        if env::predecessor_account_id() == self.token_id {
-            PromiseOrValue::Value(U128(0))
-        } else {
-            PromiseOrValue::Value(amount)
+    #[private]
+    pub fn on_proposal_approved(
+        &mut self,
+        nonce: String,
+        proposal_id: u64,
+        #[callback_result] result: Result<(), PromiseError>,
+    ) -> bool {
+        match result {
+            Ok(()) => {
+                env::log_str(&format!("claim {nonce} approved as DAO proposal {proposal_id}"));
+                true
+            }
+            Err(_) => {
+                env::log_str(&format!(
+                    "claim {nonce} is DAO proposal {proposal_id} but was not approved; the council must approve or reject it"
+                ));
+                false
+            }
         }
     }
 
     pub fn add_merchant(&mut self, account_id: AccountId) {
-        self.assert_owner();
+        self.assert_dao();
         self.merchants.insert(account_id);
     }
 
     pub fn remove_merchant(&mut self, account_id: AccountId) {
-        self.assert_owner();
+        self.assert_dao();
         self.merchants.remove(&account_id);
     }
 
     pub fn set_attestor(&mut self, public_key: PublicKey) {
-        self.assert_owner();
+        self.assert_dao();
         self.attestor_public_key = ed25519_key(&public_key);
     }
 
-    pub fn set_owner(&mut self, owner_id: AccountId) {
-        self.assert_owner();
-        self.owner_id = owner_id;
+    pub fn set_proposal_bond(&mut self, proposal_bond: U128) {
+        self.assert_dao();
+        self.proposal_bond = proposal_bond.0;
+    }
+
+    pub fn set_dao(&mut self, dao_id: AccountId) {
+        self.assert_dao();
+        self.dao_id = dao_id;
     }
 
     pub fn pause(&mut self) {
-        self.assert_owner();
+        self.assert_dao();
         self.paused = true;
     }
 
     pub fn unpause(&mut self) {
-        self.assert_owner();
+        self.assert_dao();
         self.paused = false;
-    }
-
-    pub fn recover(&mut self, amount: U128) -> Promise {
-        self.assert_owner();
-        require!(self.paused, "pause the treasury before recovering funds");
-        ext_ft::ext(self.token_id.clone())
-            .with_attached_deposit(ONE_YOCTO)
-            .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(self.owner_id.clone(), amount, None)
     }
 
     pub fn is_merchant(&self, account_id: AccountId) -> bool {
@@ -207,16 +274,17 @@ impl Treasury {
 
     pub fn get_config(&self) -> Config {
         Config {
-            owner_id: self.owner_id.clone(),
+            dao_id: self.dao_id.clone(),
             token_id: self.token_id.clone(),
             attestor_public_key: self.get_attestor(),
             units_per_cent: U128(self.units_per_cent),
+            proposal_bond: U128(self.proposal_bond),
             paused: self.paused,
         }
     }
 
-    fn assert_owner(&self) {
-        require!(env::predecessor_account_id() == self.owner_id, "only the owner can do this");
+    fn assert_dao(&self) {
+        require!(env::predecessor_account_id() == self.dao_id, "only the DAO can do this");
     }
 }
 

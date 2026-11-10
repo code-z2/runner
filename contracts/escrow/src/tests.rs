@@ -35,6 +35,7 @@ fn setup() -> Escrow {
         account("dao.sputnik-dao.near"),
         account("usdc.near"),
         account("treasury.runner.near"),
+        account("runner.sputnik-dao.near"),
         U128(USDC),
     )
 }
@@ -312,4 +313,12 @@ fn a_lock_given_up_while_unlocking_cannot_be_paid_twice() {
     escrow.give_up(U64(id));
     set_caller("escrow.runner.near", LOCKED_AT_S + 86_400, 0);
     escrow.on_unlock_attestor(U64(id), account("runner.near"), text, signature, Ok(attestor_public_key()));
+}
+
+#[test]
+fn config_reports_where_the_pool_share_goes() {
+    let escrow = setup();
+    let config = escrow.get_config();
+    assert_eq!(config.treasury_id, account("treasury.runner.near"));
+    assert_eq!(config.pool_id, account("runner.sputnik-dao.near"));
 }

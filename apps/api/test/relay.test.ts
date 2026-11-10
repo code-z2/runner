@@ -178,6 +178,43 @@ describe("POST /v1/relay", () => {
     expect(await response.json()).toEqual({ error: "deposit_not_allowed" });
   });
 
+  test("lets a claim through the DAO use up to 200 Tgas", async () => {
+    const delegate = delegateFor(
+      { receiverId: "treasury.runner.near" },
+      { methodName: "claim", args: utf8(JSON.stringify({ attestation: "{}", signature: "", merchant_id: "mamaput.near", amount_cents: 100 })), gas: 150_000_000_000_000n, deposit: 0n },
+    );
+    expect((await post(signDelegate(delegate))).status).toBe(200);
+  });
+
+  test("lets anyone donate to the DAO pool with a plain transfer", async () => {
+    const delegate = delegateFor(
+      { receiverId: "usdc.near" },
+      { methodName: "ft_transfer", args: utf8(JSON.stringify({ receiver_id: "runner.sputnik-dao.near", amount: "5000000" })), gas: 10_000_000_000_000n },
+    );
+    expect((await post(signDelegate(delegate))).status).toBe(200);
+  });
+
+  test("refuses plain transfers to anyone but the DAO", async () => {
+    const delegate = delegateFor(
+      { receiverId: "usdc.near" },
+      { methodName: "ft_transfer", args: utf8(JSON.stringify({ receiver_id: "thief.near", amount: "1" })), gas: 10_000_000_000_000n },
+    );
+    expect(await (await post(signDelegate(delegate))).json()).toEqual({ error: "call_not_allowed" });
+  });
+
+  test("no longer sends tokens into the claims module", async () => {
+    const delegate = delegateFor(
+      { receiverId: "usdc.near" },
+      { methodName: "ft_transfer_call", args: utf8(JSON.stringify({ receiver_id: "treasury.runner.near", amount: "1", msg: "" })) },
+    );
+    expect(await (await post(signDelegate(delegate))).json()).toEqual({ error: "call_not_allowed" });
+  });
+
+  test("refuses inherited object keys as method names", async () => {
+    const response = await post(signDelegate(delegateFor({}, { methodName: "toString", deposit: 0n })));
+    expect(await response.json()).toEqual({ error: "call_not_allowed" });
+  });
+
   test("refuses too much gas", async () => {
     const response = await post(signDelegate(delegateFor({}, { gas: 200_000_000_000_000n })));
     expect(await response.json()).toEqual({ error: "gas_not_allowed" });

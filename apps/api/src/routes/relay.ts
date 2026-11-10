@@ -13,41 +13,58 @@ import {
 import { checkDevice } from "./runner";
 
 const ONE_YOCTO = 1n;
-const MAX_GAS = 100_000_000_000_000n;
+const TGAS = 1_000_000_000_000n;
 const MAX_BLOCK_LEAD = 1_000n;
 const RELAYS_PER_HOUR = 30;
 const NONCE_RETRIES = 3;
 
-type Policy = Record<string, Record<string, bigint>>;
+interface Rule {
+  deposit: bigint;
+  maxGas: bigint;
+  receivers?: string[];
+}
+
+type Policy = Record<string, Record<string, Rule>>;
 
 function policy(env: Env): Policy {
+  const call = (deposit: bigint, tgas: bigint, receivers?: string[]): Rule => ({ deposit, maxGas: tgas * TGAS, receivers });
   return {
-    [env.TREASURY_CONTRACT]: { claim: 0n },
-    [env.ESCROW_CONTRACT]: { unlock: 0n, flush_pool: 0n, give_up: ONE_YOCTO, withdraw: ONE_YOCTO, lock_from_balance: ONE_YOCTO },
-    [env.TOKEN_CONTRACT]: { ft_transfer_call: ONE_YOCTO },
+    [env.TREASURY_CONTRACT]: { claim: call(0n, 200n) },
+    [env.ESCROW_CONTRACT]: {
+      unlock: call(0n, 100n),
+      flush_pool: call(0n, 100n),
+      give_up: call(ONE_YOCTO, 100n),
+      withdraw: call(ONE_YOCTO, 100n),
+      lock_from_balance: call(ONE_YOCTO, 100n),
+    },
+    [env.TOKEN_CONTRACT]: {
+      ft_transfer_call: call(ONE_YOCTO, 100n, [env.ESCROW_CONTRACT]),
+      ft_transfer: call(ONE_YOCTO, 30n, [env.DAO_ACCOUNT]),
+    },
   };
 }
 
 function checkPolicy(env: Env, delegate: DelegateAction): void {
   const call = delegate.actions[0];
   const allowed = policy(env)[delegate.receiverId];
-  if (!allowed || !(call.methodName in allowed)) {
+  const rule = allowed && Object.hasOwn(allowed, call.methodName) ? allowed[call.methodName] : undefined;
+  if (!rule) {
     throw new HttpError(422, "call_not_allowed");
   }
-  if (call.deposit !== allowed[call.methodName]) {
+  if (call.deposit !== rule.deposit) {
     throw new HttpError(422, "deposit_not_allowed");
   }
-  if (call.gas <= 0n || call.gas > MAX_GAS) {
+  if (call.gas <= 0n || call.gas > rule.maxGas) {
     throw new HttpError(422, "gas_not_allowed");
   }
-  if (delegate.receiverId === env.TOKEN_CONTRACT) {
+  if (rule.receivers) {
     let receiver: unknown;
     try {
       receiver = (JSON.parse(new TextDecoder().decode(call.args)) as { receiver_id?: unknown }).receiver_id;
     } catch {
       throw new HttpError(422, "call_not_allowed");
     }
-    if (receiver !== env.ESCROW_CONTRACT && receiver !== env.TREASURY_CONTRACT) {
+    if (typeof receiver !== "string" || !rule.receivers.includes(receiver)) {
       throw new HttpError(422, "call_not_allowed");
     }
   }
@@ -84,6 +101,7 @@ export async function relay(request: Request, env: Env): Promise<Response> {
     "TREASURY_CONTRACT",
     "ESCROW_CONTRACT",
     "TOKEN_CONTRACT",
+    "DAO_ACCOUNT",
     "RELAYER_ACCOUNT_ID",
     "RELAYER_SECRET_KEY",
   ]);

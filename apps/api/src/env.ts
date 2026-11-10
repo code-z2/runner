@@ -9,6 +9,7 @@ export interface Env {
   TREASURY_CONTRACT: string;
   ESCROW_CONTRACT: string;
   TOKEN_CONTRACT: string;
+  DAO_ACCOUNT: string;
   RELAYER_ACCOUNT_ID: string;
   RELAYER_SECRET_KEY: string;
   PORTAL_ORIGIN: string;
