@@ -134,7 +134,7 @@ In:
 
 Server checks, in order:
 
-- Exactly one `FunctionCall` action, on the allow-list below, with exactly the listed deposit and at most 100 Tgas.
+- Exactly one `FunctionCall` action, on the allow-list below, with exactly the listed deposit and no more than the listed gas.
 - The delegate signature is valid for its public key, and that key is a full access key on `sender_id`.
 - The delegate nonce is above the key's current nonce, and `max_block_height` is ahead of the chain but no more than 1,000 blocks.
 - App Attest assertion from a registered device.
@@ -142,12 +142,13 @@ Server checks, in order:
 
 Allow-list:
 
-| Contract | Method | Deposit |
-|---|---|---|
-| `TREASURY_CONTRACT` | `claim` | 0 |
-| `ESCROW_CONTRACT` | `unlock`, `flush_pool` | 0 |
-| `ESCROW_CONTRACT` | `give_up`, `withdraw`, `lock_from_balance` | 1 yoctoNEAR |
-| `TOKEN_CONTRACT` | `ft_transfer_call` with `receiver_id` = escrow or treasury | 1 yoctoNEAR |
+| Contract | Method | Deposit | Max gas |
+|---|---|---|---|
+| `TREASURY_CONTRACT` (claims module) | `claim` | 0 | 200 Tgas |
+| `ESCROW_CONTRACT` | `unlock`, `flush_pool` | 0 | 100 Tgas |
+| `ESCROW_CONTRACT` | `give_up`, `withdraw`, `lock_from_balance` | 1 yoctoNEAR | 100 Tgas |
+| `TOKEN_CONTRACT` | `ft_transfer_call` with `receiver_id` = escrow | 1 yoctoNEAR | 100 Tgas |
+| `TOKEN_CONTRACT` | `ft_transfer` with `receiver_id` = `DAO_ACCOUNT` (donation) | 1 yoctoNEAR | 30 Tgas |
 
 Out `200`: `{ "transaction_hash": "<base58>", "status": "succeeded" | "failed", "failure"?: <NEAR failure> }`. A `failed` status means the transaction ran and the contract refused it.
 
@@ -211,50 +212,85 @@ An hourly job deletes rows past their time.
 | `RESEND_API_KEY` | secret | Resend key |
 | `ESCROW_CONTRACT` | var | Goal escrow account id, for the relayer allow-list |
 | `TOKEN_CONTRACT` | var | Stablecoin account id the pool and escrow hold |
+| `DAO_ACCOUNT` | var | Sputnik DAO that holds the pool, for donations through the relayer |
 | `RELAYER_ACCOUNT_ID` | var | NEAR account that pays relay gas |
 | `RELAYER_SECRET_KEY` | secret | That account's full access key, `ed25519:<base58 64 bytes>` |
 
-## Treasury contract (`contracts/treasury`)
+## Community treasury: Sputnik DAO + claims module
 
-NEAR contract, near-sdk 5.30.1. Built in the `sourcescan/cargo-near:0.22.0-rust-1.99.1` image.
+The pool's money lives in a Sputnik DAO v2 (ORDER item 8: "Treasury on Sputnik/Trezu"), managed through Trezu. `contracts/treasury` is the claims module: it holds no money, keeps the rules, and is the only member of a DAO role that may approve payouts.
 
-Setup: `new(owner_id, token_id, attestor_public_key, units_per_cent)`.
+### The DAO
 
-- `owner_id`: the Sputnik DAO account.
-- `token_id`: the stablecoin the pool holds. For USDC (6 decimals), `units_per_cent` is `10000`.
-- `attestor_public_key`: `ed25519:<base58>` of the server's `ATTESTOR_SECRET_KEY`.
+Created from the Sputnik factory (`sputnik-v2.testnet` on testnet, `sputnik-dao.near` on mainnet). Policy:
 
-Runner call:
+```json
+{
+  "roles": [
+    {
+      "name": "council",
+      "kind": { "Group": ["<joel>", "<peter>"] },
+      "permissions": ["*:*"],
+      "vote_policy": {}
+    },
+    {
+      "name": "claims",
+      "kind": { "Group": ["<claims module account>"] },
+      "permissions": ["transfer:AddProposal", "transfer:VoteApprove"],
+      "vote_policy": { "transfer": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 1] } }
+    }
+  ],
+  "default_vote_policy": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 2] },
+  "proposal_bond": "100000000000000000000000",
+  "proposal_period": "604800000000000",
+  "bounty_bond": "100000000000000000000000",
+  "bounty_forgiveness_period": "86400000000000"
+}
+```
 
-- `claim(attestation, signature, merchant_id, amount_cents)`. Sent by the runner's own account, so the runner's key is the first signature and the attestor's is the second. Checks the attestor signature, version, caller, expiry, registered merchant, amount, and single use. Then it sends the tokens to the merchant. If the transfer fails, the pass is freed so the runner can retry before it expires.
+- Sputnik approves a proposal as soon as any one role reaches its threshold. The claims role has one member and a 1-of-1 threshold for `transfer`, so the module approves payouts alone and runners claim without waiting for votes.
+- The claims role can do nothing else: it cannot add or approve any other proposal kind.
+- Everything else needs the council: with two members and `[1, 2]`, both must approve. That covers policy, merchants, the attestor, pausing and any other movement of funds.
+- The DAO must be registered with the stablecoin contract (`storage_deposit`) to hold it.
 
-Owner calls (through DAO proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_owner`, `pause`, `unpause`, `recover(amount)`.
+### Claims module (`contracts/treasury`)
 
-One attestor for the whole system: the treasury holds the only copy of the attestor key and exposes it with the public view `get_attestor()`. The goal escrow reads it from there on every unlock, so a single `set_attestor` vote changes the key for both contracts and they can never disagree.
+Setup: `new(dao_id, token_id, attestor_public_key, units_per_cent, proposal_bond)`. For USDC (6 decimals), `units_per_cent` is `10000`. `proposal_bond` must equal the DAO's `proposal_bond`.
 
-- `recover` only works while paused and only sends to the owner. There is no other way to move funds out.
-- There is no upgrade method.
+Runner call: `claim(attestation, signature, merchant_id, amount_cents)`, about 150 Tgas, sent by the runner's own account (directly or through the relayer).
+
+1. Checks the attestor signature, version, caller, expiry, registered merchant, amount, and single use, then marks the pass used.
+2. Adds a DAO `Transfer` proposal (token, merchant, amount), attaching the bond from the module's own NEAR balance.
+3. Votes to approve it as the claims role. The DAO pays the merchant and returns the bond.
+
+If the DAO refuses the proposal in step 2, the pass is freed for a retry. If step 3 fails, the proposal stays open for the council and the pass stays used, so it can never be paid twice. If the DAO's token transfer itself fails (for example the merchant is not registered with the token), Sputnik marks the proposal Failed and anyone can re-run it with `act_proposal(id, "Finalize")` once fixed.
+
+DAO calls (through council `FunctionCall` proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_proposal_bond`, `set_dao`, `pause`, `unpause`.
+
+One attestor for the whole system: the module holds the only copy of the attestor key and exposes it with `get_attestor()`. The goal escrow reads it from there on every unlock, so one council vote changes the key for both contracts.
 
 Views: `is_merchant(account_id)`, `is_nonce_used(nonce)`, `get_attestor()`, `get_config()`.
 
-Donations: send the configured token with `ft_transfer_call`. Any other token is refunded.
+Donations go straight to the DAO account as a plain `ft_transfer` of the stablecoin.
 
-Before go-live:
+### Deploy order
 
-- The contract account must be registered with the token contract (`storage_deposit`).
-- Each merchant must also be registered with the token contract before `add_merchant`. If not, transfers to them fail and the pass is freed.
-- The contract needs a NEAR balance for storage. Each used pass keeps a 32-byte record.
+1. Create the claims module account and the DAO with the policy above.
+2. Register the DAO and each merchant with the stablecoin (`storage_deposit`).
+3. Deploy the claims module with `new(dao_id, ...)`, and fund it with a few NEAR for bonds and storage.
+4. Deploy the goal escrow with `treasury_id` = the claims module and `pool_id` = the DAO.
+5. Council adds merchants through `FunctionCall` proposals to `add_merchant`.
 
 ## Goal escrow contract (`contracts/escrow`)
 
 NEAR contract, near-sdk 5.30.1, same build image as the treasury. Holds runners' own money locked on goals. No private balance anywhere else (ORDER item 13).
 
-Setup: `new(owner_id, token_id, treasury_id, min_lock)`. The escrow depends on the treasury: deploy the treasury first, then the escrow pointing at it. Nothing else links them.
+Setup: `new(owner_id, token_id, treasury_id, pool_id, min_lock)`. `treasury_id` is the claims module (for the attestor); `pool_id` is the DAO that receives the pool's half when a runner gives up.
 
 - Lock: send the token with `ft_transfer_call` and `msg` = `{"distance_m":10000,"max_seconds":3300}` (`max_seconds` optional). Below `min_lock`, a bad goal or another token is refunded.
 - Goals: 1,000 to 100,000 m, and 60 s to 24 h when timed.
 - `unlock(lock_id, proof, signature)`: by the lock owner, with a run proof from the server. The run must start after the lock was made, cover the distance, and beat the time at its average pace. The escrow then reads the attestor key from `treasury.get_attestor()` and checks the signature in a second step; if the treasury cannot answer, the unlock fails and nothing changes. The money moves to the owner's unlocked balance in the escrow. Attach about 30 Tgas.
-- `give_up(lock_id)`: half to the owner's unlocked balance, half sent to the treasury. A failed pool transfer is kept as `pool_owed`; anyone can retry with `flush_pool()`.
+- `give_up(lock_id)`: half to the owner's unlocked balance, half sent to the DAO pool (`pool_id`). A failed pool transfer is kept as `pool_owed`; anyone can retry with `flush_pool()`.
 - `withdraw(amount, receiver_id?)`: moves unlocked money out. Restored if the transfer fails.
 - `lock_from_balance(amount, goal)`: lock unlocked money again.
 - `withdraw`, `give_up` and `lock_from_balance` need 1 yoctoNEAR attached, so only a full access key can move money.

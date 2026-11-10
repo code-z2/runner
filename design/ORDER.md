@@ -194,3 +194,14 @@ Assumption: Peter's call on 2026-11-09, Joel leads.
 - Anyone can fund the treasury from any chain through NEAR Intents. The swap delivers the treasury token to the treasury contract; no app balance in between.
 - Goal escrow: the runner locks their own money on a goal. A later run that beats it unlocks the money, which stays in the same escrow contract until the runner moves it out. Give up any time: half back, half to the pool (item 10).
 - PacePilot is opt-in only. Off by default; the live coach card shows only when it is on.
+
+## 14. Treasury on Sputnik DAO (AGREED)
+
+Assumption: Joel, 2026-11-10, reading item 8 "Treasury on Sputnik/Trezu" as the pool's funds living in a Sputnik DAO.
+
+- The pool's money lives in a Sputnik DAO v2 managed through Trezu. Council: Joel and Peter, both must approve.
+- contracts/treasury becomes the claims module: no funds, the single member of a "claims" role that may only add and approve Transfer proposals, 1-of-1.
+- A claim checks the attestation, single use, registered merchant and cap, then adds and approves a DAO Transfer to the merchant in the same transaction. No votes per claim.
+- The module holds the only attestor key; the goal escrow reads it from there. Council changes it through a FunctionCall proposal.
+- Goal escrow funds stay in the escrow contract; the pool's half on give up goes to the DAO.
+- Donations go straight to the DAO as a plain token transfer.

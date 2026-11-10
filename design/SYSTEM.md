@@ -445,3 +445,26 @@ Living record of what was built. Update on every completed item.
 - Metadata: contracts/treasury, contracts/escrow, design/API.md; 2026-11-10
 - Gaps: release wasm build needs a rerun on a machine with free memory; deploy
   order is treasury, then escrow with treasury_id
+
+## 2026-11-10 - Treasury on Sputnik DAO
+
+- Item: ORDER §14 (item 8 read as funds in a Sputnik DAO)
+- What it is: contracts/treasury reworked into a claims module. The pool lives
+  in a Sputnik DAO v2; the module is the only member of a "claims" role allowed
+  to add and approve Transfer proposals (1-of-1), so a valid claim adds and
+  approves a DAO payout in one transaction. Council (both members) governs all
+  else. Escrow gains pool_id (the DAO) for the give-up share. Relayer gets
+  per-method gas caps (claim 200 Tgas) and DAO donations via ft_transfer.
+- How it was done: approval and execution rules checked against
+  near-daos/sputnik-dao-contract source (policy.rs proposal_status: any role
+  reaching its threshold approves; approved proposals execute in the same call
+  and return the bond). Tests: claims module 21, escrow 22, API 65, all pass.
+- Why this way: runners still claim instantly while the money and all admin
+  sit in a standard Sputnik DAO that Trezu can manage; the claims role cannot
+  do anything but payouts that already passed the module's checks
+- Importance: meets the "Treasury on Sputnik/Trezu" requirement
+- Metadata: contracts/treasury, contracts/escrow, apps/api/src/routes/relay.ts,
+  design/API.md (policy JSON and deploy order); 2026-11-10
+- Gaps: not tested against a live Sputnik DAO yet (needs the testnet account);
+  release wasm builds still to run; Peter's RunnerEscrow needs pool_id in
+  EscrowDeployment
