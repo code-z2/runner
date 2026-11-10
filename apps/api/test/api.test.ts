@@ -37,7 +37,7 @@ function stubServices(rpc: Rpc): () => void {
     const params = body.params;
     if (params.request_type === "view_access_key") {
       return rpc.fullAccessKeys.has(`${params.account_id}/${params.public_key}`)
-        ? Response.json({ result: { nonce: 1, permission: "FullAccess" } })
+        ? Response.json({ result: { nonce: 1, permission: "FullAccess", block_hash: "11111111111111111111111111111111", block_height: 100 } })
         : Response.json({ result: { error: "access key does not exist" } });
     }
     const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());

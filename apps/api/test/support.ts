@@ -35,7 +35,9 @@ class Statement {
 
 export function createDatabase(): D1Database {
   const db = new Database(":memory:");
-  db.exec(readFileSync(join(import.meta.dir, "..", "migrations", "0001_init.sql"), "utf8"));
+  for (const file of ["0001_init.sql", "0002_relay_log.sql"]) {
+    db.exec(readFileSync(join(import.meta.dir, "..", "migrations", file), "utf8"));
+  }
   return {
     prepare: (sql: string) => new Statement(db, sql),
     batch: async (statements: Statement[]) => {
@@ -58,6 +60,10 @@ export function createEnv(overrides: Partial<Env> = {}): Env {
     NEAR_RPC_URL: "https://rpc.test.near",
     NEAR_RECIPIENT: "runner-api",
     TREASURY_CONTRACT: "treasury.runner.near",
+    ESCROW_CONTRACT: "escrow.runner.near",
+    TOKEN_CONTRACT: "usdc.near",
+    RELAYER_ACCOUNT_ID: "relayer.runner.near",
+    RELAYER_SECRET_KEY: "",
     PORTAL_ORIGIN: "https://portal.runner.test",
     MAIL_FROM: "Runner <login@runner.test>",
     ATTESTOR_SECRET_KEY: Buffer.alloc(32, 7).toString("base64"),
