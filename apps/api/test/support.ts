@@ -62,6 +62,7 @@ export function createEnv(overrides: Partial<Env> = {}): Env {
     TREASURY_CONTRACT: "treasury.runner.near",
     ESCROW_CONTRACT: "escrow.runner.near",
     TOKEN_CONTRACT: "usdc.near",
+    DAO_ACCOUNT: "runner.sputnik-dao.near",
     RELAYER_ACCOUNT_ID: "relayer.runner.near",
     RELAYER_SECRET_KEY: "",
     PORTAL_ORIGIN: "https://portal.runner.test",
