@@ -144,6 +144,16 @@ Amends item 8's admin shape. The pool belongs to the runners: every claiming run
 - Genesis thresholds (community-ratifiable later): policy kinds pass on majority of votes cast with a 5% quorum of the role. Transfers stay module-only; council keeps no transfer power.
 - Joel translates this to the Sputnik policy JSON and extends the claims module (membership proposals + bond budget). Until then item 8's council policy stands.
 
+## 8b. Seeding (AGREED 2026-11-10)
+
+New implicit accounts don't exist on-chain until first funded, and the relayer's full-access-key check fails closed without existence. The DAO subsidizes exactly one seed per runner; joining itself stays permissionless (anyone can always self-fund their implicit address).
+
+- Seed before first tx, never at keygen. Account creators who never transact cost nothing. The claim endpoint ensures seeded before attesting: existence check → funder transfer (~0.005 NEAR fixed) → await commitment → proceed. First claim carries one extra round trip; later ones are unaffected. No app-side seed call.
+- Primitive (Joel): internal seeder also exposed as `POST /v1/seed` for future first-tx flows. Same guards as claims (SIWA + App Attest), idempotent by existence check, TOCTOU double-seed harmless. `503` when the funder is dry, with the app falling back to showing the fundable address.
+- Anti-farm: one seed per Apple ID + genuine device; seed-rate vs claim-rate monitored. Residual farming accepted as faucet-model cost.
+- Ops: plain seeder account, DAO-capitalized once (100 NEAR ≈ 20,000 seeds), balance alert at 20% runway, rotation without contract changes. Claims module needs its own separate NEAR balance for membership proposal bonds — deploy checklist item.
+- Claim-time order: ensure seeded → attest → claim executes → module proposes `AddMemberToRole` on first success. Seeding (off-chain subsidy) and joining (on-chain membership) ride the same first claim, independent mechanisms.
+
 ## 9. Wallet stack (AGREED)
 
 - OAuth: Apple only for now. NEAR social login; builds on item 4.
