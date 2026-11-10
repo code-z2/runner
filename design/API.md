@@ -118,6 +118,41 @@ Lists approved locations in up to 9 coarse cells (about 5 x 5 km each). The app 
 
 Out: `{ "locations": [ { id, name, lat, lng, categories, near_account } ] }`. Cached by clients for 10 minutes.
 
+## Relayer (`POST /v1/relay`)
+
+Runners never need NEAR for gas. The app signs a NEP-366 `SignedDelegateAction` with the runner's full access key and the server wraps it in a transaction it pays for. The deposit inside the call (the 1 yoctoNEAR some escrow methods need) still comes from the runner's account, so the contracts' full-access check holds.
+
+In:
+
+```json
+{
+  "signed_delegate": "<base64 borsh SignedDelegateAction>",
+  "key_id": "<base64>",
+  "assertion": "<base64 App Attest assertion, clientData = the signed_delegate string>"
+}
+```
+
+Server checks, in order:
+
+- Exactly one `FunctionCall` action, on the allow-list below, with exactly the listed deposit and at most 100 Tgas.
+- The delegate signature is valid for its public key, and that key is a full access key on `sender_id`.
+- The delegate nonce is above the key's current nonce, and `max_block_height` is ahead of the chain but no more than 1,000 blocks.
+- App Attest assertion from a registered device.
+- At most 30 relays an hour per account and per device.
+
+Allow-list:
+
+| Contract | Method | Deposit |
+|---|---|---|
+| `TREASURY_CONTRACT` | `claim` | 0 |
+| `ESCROW_CONTRACT` | `unlock`, `flush_pool` | 0 |
+| `ESCROW_CONTRACT` | `give_up`, `withdraw`, `lock_from_balance` | 1 yoctoNEAR |
+| `TOKEN_CONTRACT` | `ft_transfer_call` with `receiver_id` = escrow or treasury | 1 yoctoNEAR |
+
+Out `200`: `{ "transaction_hash": "<base58>", "status": "succeeded" | "failed", "failure"?: <NEAR failure> }`. A `failed` status means the transaction ran and the contract refused it.
+
+Fails: `400` bad input, `401` signature, key or device check fails, `409` delegate nonce already used, `422` call not allowed, `429` too many relays, `502` NEAR rejected the transaction, `503` relayer not configured or busy.
+
 ## Claim at the merchant (contract, no server call)
 
 1. Merchant shows a fixed QR with their `near_account`.
@@ -174,6 +209,10 @@ An hourly job deletes rows past their time.
 | `MAIL_FROM` | var | Sender address for sign-in links |
 | `ATTESTOR_SECRET_KEY` | secret | Ed25519 seed, 32 bytes, base64 |
 | `RESEND_API_KEY` | secret | Resend key |
+| `ESCROW_CONTRACT` | var | Goal escrow account id, for the relayer allow-list |
+| `TOKEN_CONTRACT` | var | Stablecoin account id the pool and escrow hold |
+| `RELAYER_ACCOUNT_ID` | var | NEAR account that pays relay gas |
+| `RELAYER_SECRET_KEY` | secret | That account's full access key, `ed25519:<base58 64 bytes>` |
 
 ## Treasury contract (`contracts/treasury`)
 
