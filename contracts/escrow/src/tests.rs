@@ -248,9 +248,40 @@ fn unlocked_money_can_be_locked_again() {
 }
 
 #[test]
-#[should_panic(expected = "only the owner can do this")]
-fn only_the_owner_changes_the_attestor() {
+#[should_panic(expected = "only the treasury can change the attestor")]
+fn the_dao_cannot_change_the_attestor_directly() {
     let mut escrow = setup();
-    set_caller("runner.near", LOCKED_AT_S, 0);
-    escrow.set_attestor(attestor_public_key());
+    set_caller("dao.sputnik-dao.near", LOCKED_AT_S, 0);
+    escrow.sync_attestor(attestor_public_key());
+}
+
+#[test]
+fn the_treasury_rotates_the_attestor_for_the_escrow() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    let next = SigningKey::from_bytes(&[9u8; 32]);
+    let mut key = vec![0u8];
+    key.extend_from_slice(next.verifying_key().as_bytes());
+    set_caller("treasury.runner.near", LOCKED_AT_S, 0);
+    escrow.sync_attestor(PublicKey::try_from(key).unwrap());
+
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, _) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    let signature = Base64VecU8(next.sign(text.as_bytes()).to_bytes().to_vec());
+    assert_eq!(escrow.unlock(U64(id), text, signature), U128(25 * USDC));
+}
+
+#[test]
+#[should_panic(expected = "invalid attestor signature")]
+fn the_old_attestor_stops_working_after_rotation() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    let mut key = vec![0u8];
+    key.extend_from_slice(SigningKey::from_bytes(&[9u8; 32]).verifying_key().as_bytes());
+    set_caller("treasury.runner.near", LOCKED_AT_S, 0);
+    escrow.sync_attestor(PublicKey::try_from(key).unwrap());
+
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    escrow.unlock(U64(id), text, signature);
 }
