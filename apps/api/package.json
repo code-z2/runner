@@ -9,7 +9,8 @@
     "migrate:local": "wrangler d1 migrations apply runner-api --local",
     "migrate:remote": "wrangler d1 migrations apply runner-api --remote",
     "deploy": "wrangler deploy",
-    "rotate-attestor": "bun scripts/rotate-attestor.ts"
+    "rotate-attestor": "bun scripts/rotate-attestor.ts",
+    "rotate-relayer-key": "bun scripts/rotate-relayer-key.ts"
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",
