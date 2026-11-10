@@ -425,3 +425,22 @@ Living record of what was built. Update on every completed item.
 - Metadata: apps/api/src/nearTx.ts, src/routes/relay.ts, migrations/0002; 2026-11-09
 - Gaps: not deployed; needs the relayer account, its key as a secret, the
   contract and token ids, and migration 0002 applied to D1
+
+## 2026-11-10 - One attestor for treasury and escrow
+
+- Item: Peter's request that one DAO vote changes the attestor everywhere
+- What it is: the treasury is the only authority over the attestor key. It
+  links the escrow with set_escrow, pushes its key there on every set_attestor
+  vote, and anyone can retry with sync_escrow_attestor if a push fails. The
+  escrow's sync_attestor only accepts calls from the treasury contract; its
+  own DAO-only set_attestor is gone.
+- How it was done: cross-contract push with a logging callback; 7 new treasury
+  tests (25 total) and 3 new escrow tests (20 total), all passing in the pinned
+  cargo-near image
+- Why this way: one vote, no drift, while goal escrow funds stay in their own
+  contract apart from the pool (ORDER items 9 and 10); unlocks stay a single
+  local signature check
+- Importance: governance of the attestor now covers the whole money system
+- Metadata: contracts/treasury, contracts/escrow, design/API.md; 2026-11-10
+- Gaps: the release wasm build was cut short by low memory on this machine and
+  needs a rerun; deploy order is treasury, escrow, then DAO set_escrow
