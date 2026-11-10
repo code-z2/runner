@@ -199,14 +199,17 @@ impl Treasury {
         self.used_nonces.contains(&parse_nonce(&nonce))
     }
 
-    pub fn get_config(&self) -> Config {
+    pub fn get_attestor(&self) -> PublicKey {
         let mut key = vec![0u8];
         key.extend_from_slice(&self.attestor_public_key);
+        PublicKey::try_from(key).unwrap_or_else(|_| env::panic_str("stored attestor key is invalid"))
+    }
+
+    pub fn get_config(&self) -> Config {
         Config {
             owner_id: self.owner_id.clone(),
             token_id: self.token_id.clone(),
-            attestor_public_key: PublicKey::try_from(key)
-                .unwrap_or_else(|_| env::panic_str("stored attestor key is invalid")),
+            attestor_public_key: self.get_attestor(),
             units_per_cent: U128(self.units_per_cent),
             paused: self.paused,
         }

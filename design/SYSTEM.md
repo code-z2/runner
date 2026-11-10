@@ -425,3 +425,23 @@ Living record of what was built. Update on every completed item.
 - Metadata: apps/api/src/nearTx.ts, src/routes/relay.ts, migrations/0002; 2026-11-09
 - Gaps: not deployed; needs the relayer account, its key as a secret, the
   contract and token ids, and migration 0002 applied to D1
+
+## 2026-11-10 - One attestor for treasury and escrow
+
+- Item: Peter's request that one DAO vote changes the attestor everywhere
+- What it is: the treasury holds the only attestor key and exposes it with a
+  public get_attestor view. The escrow stores no key; unlock checks the proof
+  locally, reads the key from the treasury, and verifies the signature in a
+  callback that re-checks the lock before paying. The escrow depends on the
+  treasury, not the other way round.
+- How it was done: Peter's suggestion over a first push-based version (which
+  needed the treasury to know the escrow and a resync path); cross-contract
+  view + private callback; treasury and escrow unit tests in the pinned
+  cargo-near image
+- Why this way: one vote, no stored copies that can drift, no linking step at
+  deploy; unlocks are rare so the extra hop is cheap; goal escrow funds stay in
+  their own contract apart from the pool (ORDER items 9 and 10)
+- Importance: governance of the attestor now covers the whole money system
+- Metadata: contracts/treasury, contracts/escrow, design/API.md; 2026-11-10
+- Gaps: release wasm build needs a rerun on a machine with free memory; deploy
+  order is treasury, then escrow with treasury_id

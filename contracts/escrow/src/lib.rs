@@ -8,6 +8,8 @@ use near_sdk::{
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
 const GAS_FOR_RESOLVE: Gas = Gas::from_tgas(10);
+const GAS_FOR_ATTESTOR_VIEW: Gas = Gas::from_tgas(5);
+const GAS_FOR_UNLOCK_RESOLVE: Gas = Gas::from_tgas(15);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 const MIN_GOAL_DISTANCE_M: u32 = 1_000;
@@ -52,7 +54,6 @@ pub struct Config {
     pub owner_id: AccountId,
     pub token_id: AccountId,
     pub treasury_id: AccountId,
-    pub attestor_public_key: PublicKey,
     pub min_lock: U128,
     pub pool_owed: U128,
 }
@@ -72,6 +73,12 @@ struct RunProof {
     active_seconds: u32,
 }
 
+#[ext_contract(ext_treasury)]
+#[allow(dead_code)]
+trait Treasury {
+    fn get_attestor(&self) -> PublicKey;
+}
+
 #[ext_contract(ext_ft)]
 #[allow(dead_code)]
 trait FungibleToken {
@@ -84,7 +91,6 @@ pub struct Escrow {
     owner_id: AccountId,
     token_id: AccountId,
     treasury_id: AccountId,
-    attestor_public_key: [u8; 32],
     min_lock: u128,
     next_lock_id: u64,
     pool_owed: u128,
@@ -124,7 +130,6 @@ impl Escrow {
         owner_id: AccountId,
         token_id: AccountId,
         treasury_id: AccountId,
-        attestor_public_key: PublicKey,
         min_lock: U128,
     ) -> Self {
         require!(min_lock.0 > 0, "min_lock must be positive");
@@ -132,7 +137,6 @@ impl Escrow {
             owner_id,
             token_id,
             treasury_id,
-            attestor_public_key: ed25519_key(&attestor_public_key),
             min_lock: min_lock.0,
             next_lock_id: 0,
             pool_owed: 0,
@@ -165,17 +169,10 @@ impl Escrow {
         U64(self.create_lock(owner_id, amount.0, goal))
     }
 
-    pub fn unlock(&mut self, lock_id: U64, proof: String, signature: Base64VecU8) -> U128 {
+    pub fn unlock(&mut self, lock_id: U64, proof: String, signature: Base64VecU8) -> Promise {
         let owner_id = env::predecessor_account_id();
         let lock = self.owned_lock(lock_id.0, &owner_id);
-        let signature: [u8; 64] = signature
-            .0
-            .try_into()
-            .unwrap_or_else(|_| env::panic_str("invalid attestor signature"));
-        require!(
-            env::ed25519_verify(&signature, proof.as_bytes(), &self.attestor_public_key),
-            "invalid attestor signature"
-        );
+        require!(signature.0.len() == 64, "invalid attestor signature");
         let run: RunProof = serde_json::from_str(&proof).unwrap_or_else(|_| env::panic_str("invalid run proof"));
         require!(run.v == 1 && run.kind == "run", "unsupported run proof");
         require!(run.account_id == owner_id, "run proof belongs to another account");
@@ -184,7 +181,36 @@ impl Escrow {
             "run started before the goal was locked"
         );
         require!(goal_is_met(&lock.goal, run.distance_m, run.active_seconds), "run does not meet the goal");
-        let amount = lock.amount;
+        ext_treasury::ext(self.treasury_id.clone())
+            .with_static_gas(GAS_FOR_ATTESTOR_VIEW)
+            .get_attestor()
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_UNLOCK_RESOLVE)
+                    .on_unlock_attestor(lock_id, owner_id, proof, signature),
+            )
+    }
+
+    #[private]
+    pub fn on_unlock_attestor(
+        &mut self,
+        lock_id: U64,
+        owner_id: AccountId,
+        proof: String,
+        signature: Base64VecU8,
+        #[callback_result] attestor: Result<PublicKey, PromiseError>,
+    ) -> U128 {
+        let attestor =
+            attestor.unwrap_or_else(|_| env::panic_str("could not read the attestor from the treasury"));
+        let signature: [u8; 64] = signature
+            .0
+            .try_into()
+            .unwrap_or_else(|_| env::panic_str("invalid attestor signature"));
+        require!(
+            env::ed25519_verify(&signature, proof.as_bytes(), &ed25519_key(&attestor)),
+            "invalid attestor signature"
+        );
+        let amount = self.owned_lock(lock_id.0, &owner_id).amount;
         self.remove_lock(lock_id.0, &owner_id);
         self.credit(&owner_id, amount);
         U128(amount)
@@ -252,11 +278,6 @@ impl Escrow {
         false
     }
 
-    pub fn set_attestor(&mut self, public_key: PublicKey) {
-        self.assert_owner();
-        self.attestor_public_key = ed25519_key(&public_key);
-    }
-
     pub fn set_min_lock(&mut self, min_lock: U128) {
         self.assert_owner();
         require!(min_lock.0 > 0, "min_lock must be positive");
@@ -288,14 +309,10 @@ impl Escrow {
     }
 
     pub fn get_config(&self) -> Config {
-        let mut key = vec![0u8];
-        key.extend_from_slice(&self.attestor_public_key);
         Config {
             owner_id: self.owner_id.clone(),
             token_id: self.token_id.clone(),
             treasury_id: self.treasury_id.clone(),
-            attestor_public_key: PublicKey::try_from(key)
-                .unwrap_or_else(|_| env::panic_str("stored attestor key is invalid")),
             min_lock: U128(self.min_lock),
             pool_owed: U128(self.pool_owed),
         }

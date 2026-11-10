@@ -221,3 +221,34 @@ fn config_reports_the_attestor_key() {
     assert_eq!(config.units_per_cent, U128(10_000));
     assert!(!config.paused);
 }
+
+fn other_key() -> PublicKey {
+    let mut key = vec![0u8];
+    key.extend_from_slice(SigningKey::from_bytes(&[9u8; 32]).verifying_key().as_bytes());
+    PublicKey::try_from(key).unwrap()
+}
+
+#[test]
+fn anyone_can_read_the_attestor() {
+    let treasury = setup();
+    set_caller("escrow.runner.near");
+    assert_eq!(treasury.get_attestor(), attestor_public_key());
+}
+
+#[test]
+fn a_dao_vote_on_the_attestor_is_what_everyone_reads() {
+    let mut treasury = setup();
+    treasury.set_attestor(other_key());
+    set_caller("escrow.runner.near");
+    assert_eq!(treasury.get_attestor(), other_key());
+}
+
+#[test]
+#[should_panic(expected = "invalid attestor signature")]
+fn the_old_attestor_stops_working_after_rotation() {
+    let mut treasury = setup();
+    treasury.set_attestor(other_key());
+    set_caller("runner.near");
+    let (attestation, signature) = valid_pass();
+    let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
+}

@@ -230,10 +230,12 @@ Runner call:
 
 Owner calls (through DAO proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_owner`, `pause`, `unpause`, `recover(amount)`.
 
+One attestor for the whole system: the treasury holds the only copy of the attestor key and exposes it with the public view `get_attestor()`. The goal escrow reads it from there on every unlock, so a single `set_attestor` vote changes the key for both contracts and they can never disagree.
+
 - `recover` only works while paused and only sends to the owner. There is no other way to move funds out.
 - There is no upgrade method.
 
-Views: `is_merchant(account_id)`, `is_nonce_used(nonce)`, `get_config()`.
+Views: `is_merchant(account_id)`, `is_nonce_used(nonce)`, `get_attestor()`, `get_config()`.
 
 Donations: send the configured token with `ft_transfer_call`. Any other token is refunded.
 
@@ -247,15 +249,16 @@ Before go-live:
 
 NEAR contract, near-sdk 5.30.1, same build image as the treasury. Holds runners' own money locked on goals. No private balance anywhere else (ORDER item 13).
 
-Setup: `new(owner_id, token_id, treasury_id, attestor_public_key, min_lock)`.
+Setup: `new(owner_id, token_id, treasury_id, min_lock)`. The escrow depends on the treasury: deploy the treasury first, then the escrow pointing at it. Nothing else links them.
 
 - Lock: send the token with `ft_transfer_call` and `msg` = `{"distance_m":10000,"max_seconds":3300}` (`max_seconds` optional). Below `min_lock`, a bad goal or another token is refunded.
 - Goals: 1,000 to 100,000 m, and 60 s to 24 h when timed.
-- `unlock(lock_id, proof, signature)`: by the lock owner, with a run proof from the server. The run must start after the lock was made, cover the distance, and beat the time at its average pace. The money moves to the owner's unlocked balance in the escrow.
+- `unlock(lock_id, proof, signature)`: by the lock owner, with a run proof from the server. The run must start after the lock was made, cover the distance, and beat the time at its average pace. The escrow then reads the attestor key from `treasury.get_attestor()` and checks the signature in a second step; if the treasury cannot answer, the unlock fails and nothing changes. The money moves to the owner's unlocked balance in the escrow. Attach about 30 Tgas.
 - `give_up(lock_id)`: half to the owner's unlocked balance, half sent to the treasury. A failed pool transfer is kept as `pool_owed`; anyone can retry with `flush_pool()`.
 - `withdraw(amount, receiver_id?)`: moves unlocked money out. Restored if the transfer fails.
 - `lock_from_balance(amount, goal)`: lock unlocked money again.
 - `withdraw`, `give_up` and `lock_from_balance` need 1 yoctoNEAR attached, so only a full access key can move money.
-- Owner (DAO): `set_attestor`, `set_min_lock`, `set_owner`. No pause and no admin withdraw: runners can always take their unlocked money out.
+- Owner (DAO): `set_min_lock`, `set_owner`. No pause and no admin withdraw: runners can always take their unlocked money out.
+- Attestor: the escrow stores no key of its own; it always uses the treasury's. Escrow funds still stay in this contract, apart from the pool.
 - Views: `get_lock`, `get_locks(account_id)`, `get_balance(account_id)`, `get_config()`.
 - No deadline and no automatic loss (item 10).

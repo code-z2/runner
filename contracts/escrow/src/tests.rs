@@ -35,7 +35,6 @@ fn setup() -> Escrow {
         account("dao.sputnik-dao.near"),
         account("usdc.near"),
         account("treasury.runner.near"),
-        attestor_public_key(),
         U128(USDC),
     )
 }
@@ -59,6 +58,18 @@ fn proof(owner: &str, started_at: u64, distance_m: u32, active_seconds: u32) -> 
     );
     let signature = attestor().sign(text.as_bytes()).to_bytes().to_vec();
     (text, Base64VecU8(signature))
+}
+
+fn unlock_with_key(escrow: &mut Escrow, id: u64, text: String, signature: Base64VecU8, key: PublicKey) -> U128 {
+    let owner = env::predecessor_account_id();
+    let now = env::block_timestamp() / NANOS_PER_SECOND;
+    let _ = escrow.unlock(U64(id), text.clone(), signature.clone());
+    set_caller("escrow.runner.near", now, 0);
+    escrow.on_unlock_attestor(U64(id), owner, text, signature, Ok(key))
+}
+
+fn unlock(escrow: &mut Escrow, id: u64, text: String, signature: Base64VecU8) -> U128 {
+    unlock_with_key(escrow, id, text, signature, attestor_public_key())
 }
 
 #[test]
@@ -92,7 +103,7 @@ fn a_run_that_beats_the_goal_unlocks_into_the_escrow_balance() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_020, 3_250);
-    assert_eq!(escrow.unlock(U64(id), text, signature), U128(25 * USDC));
+    assert_eq!(unlock(&mut escrow, id, text, signature), U128(25 * USDC));
     assert!(escrow.get_lock(U64(id)).is_none());
     assert_eq!(escrow.get_balance(account("runner.near")), U128(25 * USDC));
 }
@@ -103,7 +114,7 @@ fn a_longer_run_counts_by_its_average_pace() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 12_000, 3_960);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
     assert_eq!(escrow.get_balance(account("runner.near")), U128(25 * USDC));
 }
 
@@ -114,7 +125,7 @@ fn a_slow_run_does_not_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_301);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
 }
 
 #[test]
@@ -124,7 +135,7 @@ fn a_short_run_does_not_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 9_990, 2_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
 }
 
 #[test]
@@ -134,7 +145,7 @@ fn an_earlier_run_does_not_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S - 1, 10_000, 3_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
 }
 
 #[test]
@@ -144,7 +155,7 @@ fn someone_elses_run_does_not_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("friend.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
 }
 
 #[test]
@@ -154,7 +165,7 @@ fn a_changed_proof_does_not_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 5_000, 1_500);
-    escrow.unlock(U64(id), text.replace("5000", "10000"), signature);
+    unlock(&mut escrow, id, text.replace("5000", "10000"), signature);
 }
 
 #[test]
@@ -169,7 +180,7 @@ fn a_claim_pass_is_not_a_run_proof() {
         "01".repeat(32)
     );
     let signature = Base64VecU8(attestor().sign(pass.as_bytes()).to_bytes().to_vec());
-    escrow.unlock(U64(id), pass, signature);
+    unlock(&mut escrow, id, pass, signature);
 }
 
 #[test]
@@ -179,7 +190,7 @@ fn only_the_owner_can_unlock() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("thief.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("thief.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
 }
 
 #[test]
@@ -217,7 +228,7 @@ fn unlocked_money_can_be_withdrawn_and_is_restored_if_the_transfer_fails() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
     set_caller("runner.near", LOCKED_AT_S + 86_500, 1);
     let _ = escrow.withdraw(U128(10 * USDC), None);
     assert_eq!(escrow.get_balance(account("runner.near")), U128(15 * USDC));
@@ -240,17 +251,65 @@ fn unlocked_money_can_be_locked_again() {
     let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
     set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
     let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
-    escrow.unlock(U64(id), text, signature);
+    unlock(&mut escrow, id, text, signature);
     set_caller("runner.near", LOCKED_AT_S + 86_500, 1);
     let next = escrow.lock_from_balance(U128(20 * USDC), Goal { distance_m: 21_098, max_seconds: Some(7_200) });
     assert_eq!(escrow.get_balance(account("runner.near")), U128(5 * USDC));
     assert_eq!(escrow.get_lock(next).unwrap().amount, U128(20 * USDC));
 }
 
+fn rotated() -> SigningKey {
+    SigningKey::from_bytes(&[9u8; 32])
+}
+
+fn rotated_public_key() -> PublicKey {
+    let mut key = vec![0u8];
+    key.extend_from_slice(rotated().verifying_key().as_bytes());
+    PublicKey::try_from(key).unwrap()
+}
+
 #[test]
-#[should_panic(expected = "only the owner can do this")]
-fn only_the_owner_changes_the_attestor() {
+fn unlocking_checks_the_key_the_treasury_holds_now() {
     let mut escrow = setup();
-    set_caller("runner.near", LOCKED_AT_S, 0);
-    escrow.set_attestor(attestor_public_key());
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, _) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    let signature = Base64VecU8(rotated().sign(text.as_bytes()).to_bytes().to_vec());
+    assert_eq!(unlock_with_key(&mut escrow, id, text, signature, rotated_public_key()), U128(25 * USDC));
+}
+
+#[test]
+#[should_panic(expected = "invalid attestor signature")]
+fn the_old_attestor_stops_working_once_the_treasury_rotates() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    unlock_with_key(&mut escrow, id, text, signature, rotated_public_key());
+}
+
+#[test]
+#[should_panic(expected = "could not read the attestor from the treasury")]
+fn unlocking_fails_closed_when_the_treasury_cannot_answer() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    let _ = escrow.unlock(U64(id), text.clone(), signature.clone());
+    set_caller("escrow.runner.near", LOCKED_AT_S + 86_400, 0);
+    escrow.on_unlock_attestor(U64(id), account("runner.near"), text, signature, Err(PromiseError::Failed));
+}
+
+#[test]
+#[should_panic(expected = "lock not found")]
+fn a_lock_given_up_while_unlocking_cannot_be_paid_twice() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.near", 25 * USDC);
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.near", LOCKED_AT_S + 3_600, 10_000, 3_000);
+    let _ = escrow.unlock(U64(id), text.clone(), signature.clone());
+    set_caller("runner.near", LOCKED_AT_S + 86_400, 1);
+    escrow.give_up(U64(id));
+    set_caller("escrow.runner.near", LOCKED_AT_S + 86_400, 0);
+    escrow.on_unlock_attestor(U64(id), account("runner.near"), text, signature, Ok(attestor_public_key()));
 }
