@@ -468,3 +468,20 @@ Living record of what was built. Update on every completed item.
 - Gaps: not tested against a live Sputnik DAO yet (needs the testnet account);
   release wasm builds still to run; Peter's RunnerEscrow needs pool_id in
   EscrowDeployment
+
+## 2026-11-10 - Figma redesign pass 2
+
+- Item: UI polish from Peter's references, Mobbin and Pinterest
+- What it is: ivory editorial theme with dark live, countdown and claim
+  screens; photos on start (dawn runner), summary (shoes, "Fastest 5K this
+  month" badge) and places (nearest spot card); claim pass moved off the
+  summary hero into the small banner; one escrow card in the wallet (total,
+  goal in progress, ready to move); bold distance and "Slide to finish" on the
+  live run; floating dark pill tab bar; serif headings with one italic word
+- How it was done: Figma Plugin API from the signed-in browser console (the MCP
+  connection hit the Starter plan limit); photos generated in Gemini, stored in
+  design/photos and loaded into Figma from the public repo
+- Why this way: luxury and editorial references lead with photos, warm neutrals
+  and serif type; Peter asked for a less obtrusive claim pass and a single wallet
+- Importance: visual target for the SwiftUI screens
+- Metadata: https://www.figma.com/design/3pOXDAoe1amTH89MBf2ymP, design/photos; 2026-11-10
