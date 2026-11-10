@@ -17,5 +17,9 @@ public protocol GatewayClient: Sendable {
 
   func claimPass(_ request: ClaimPassRequest) async throws -> ClaimPass
 
+  /// Seed the runner's implicit account. Idempotent: an existing account
+  /// returns `seeded: false`. A dry funder surfaces as `GatewayError.server`.
+  func seed(_ request: SeedRequest) async throws -> SeedResult
+
   func merchants(cells: [String]) async throws -> [MerchantLocation]
 }

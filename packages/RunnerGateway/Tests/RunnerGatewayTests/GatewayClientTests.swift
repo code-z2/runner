@@ -158,4 +158,39 @@ struct GatewayClientTests {
       try await client.challenge()
     }
   }
+
+  @Test
+  func seedPostsAccountAndDecodesCreated() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(try json(["seeded": true, "tx": "tx-1"]), status: 200)
+    let result = try await client.seed(SeedRequest(accountID: "abc.near"))
+    #expect(result == SeedResult(seeded: true, txHash: "tx-1"))
+    let request = await transport.lastRequest
+    #expect(request?.httpMethod == "POST")
+    #expect(request?.url?.path == "/v1/seed")
+    let rawBody = try #require(request?.httpBody)
+    let decoded = try JSONSerialization.jsonObject(with: rawBody)
+    let body = try #require(decoded as? [String: String])
+    #expect(body == ["account_id": "abc.near"])
+  }
+
+  @Test
+  func seedExistingAccountReturnsUnseeded() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(try json(["seeded": false]), status: 200)
+    let result = try await client.seed(SeedRequest(accountID: "abc.near"))
+    #expect(result == SeedResult(seeded: false))
+  }
+
+  @Test
+  func dryFunderMapsToTypedError() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(try json(["error": "funder_dry"]), status: 503)
+    await #expect(throws: GatewayError.server(status: 503, code: "funder_dry")) {
+      try await client.seed(SeedRequest(accountID: "abc.near"))
+    }
+  }
 }
