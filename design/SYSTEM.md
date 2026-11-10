@@ -405,3 +405,23 @@ Living record of what was built. Update on every completed item.
   ivory, ink and gold palette in the Figma file
 - Importance: needed now for the NEAR auth production access application
 - Metadata: design/brand; 2026-11-09
+
+## 2026-11-09 - Gas relayer (NEP-366)
+
+- Item: POST /v1/relay so runners never hold NEAR for gas
+- What it is: the app sends a SignedDelegateAction signed with the runner's
+  full access key; the server checks an allow-list (treasury claim, escrow
+  unlock/give_up/withdraw/lock_from_balance/flush_pool, token ft_transfer_call
+  to escrow or treasury), exact deposits, a 100 Tgas cap, the delegate
+  signature and key, nonce and expiry, App Attest and a 30 per hour limit, then
+  wraps it in a transaction signed by RELAYER_ACCOUNT_ID and sends it
+- How it was done: small borsh encoder/decoder for the two NEAR types needed
+  (no runtime dependency); byte-for-byte checked against @near-js/transactions
+  2.5.1 in tests (dev dependency only); 17 new tests, 60 in total
+- Why this way: deposits stay with the runner so the contracts' 1-yocto
+  full-access rule still means the runner approved the move; the allow-list
+  stops the relayer paying for anything else
+- Importance: closes Peter's open item for RunnerEscrow's submitter
+- Metadata: apps/api/src/nearTx.ts, src/routes/relay.ts, migrations/0002; 2026-11-09
+- Gaps: not deployed; needs the relayer account, its key as a secret, the
+  contract and token ids, and migration 0002 applied to D1

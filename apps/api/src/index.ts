@@ -9,6 +9,7 @@ import {
   requestLogin,
   updateLocation,
 } from "./routes/merchant";
+import { relay } from "./routes/relay";
 import { createAttestation, createChallenge, listMerchants, registerDevice } from "./routes/runner";
 
 const ATTESTED_RETENTION_S = 3 * 24 * 3600;
@@ -33,6 +34,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   if (method === "POST" && pathname === "/v1/devices") return registerDevice(request, env);
   if (method === "POST" && pathname === "/v1/attestations") return createAttestation(request, env);
   if (method === "GET" && pathname === "/v1/merchants") return listMerchants(url, env);
+  if (method === "POST" && pathname === "/v1/relay") return relay(request, env);
 
   if (method === "POST" && pathname === "/v1/merchant/login") return requestLogin(request, env);
   if (method === "POST" && pathname === "/v1/merchant/session") return createSession(request, env);
@@ -90,6 +92,7 @@ export async function cleanup(env: Env): Promise<void> {
     env.DB.prepare("DELETE FROM login_tokens WHERE expires_at <= ?").bind(now),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
     env.DB.prepare("DELETE FROM attested_activities WHERE ended_at < ?").bind(now - ATTESTED_RETENTION_S),
+    env.DB.prepare("DELETE FROM relay_log WHERE created_at < ?").bind(now - 3600),
   ]);
 }
 

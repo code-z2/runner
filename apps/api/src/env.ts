@@ -7,6 +7,10 @@ export interface Env {
   NEAR_RPC_URL: string;
   NEAR_RECIPIENT: string;
   TREASURY_CONTRACT: string;
+  ESCROW_CONTRACT: string;
+  TOKEN_CONTRACT: string;
+  RELAYER_ACCOUNT_ID: string;
+  RELAYER_SECRET_KEY: string;
   PORTAL_ORIGIN: string;
   MAIL_FROM: string;
   ATTESTOR_SECRET_KEY: string;

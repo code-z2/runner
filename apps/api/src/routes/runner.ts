@@ -55,7 +55,7 @@ export async function registerDevice(request: Request, env: Env): Promise<Respon
   return json({ key_id: keyId }, 201);
 }
 
-async function checkDevice(env: Env, keyId: string, assertion: Uint8Array, payload: string): Promise<void> {
+export async function checkDevice(env: Env, keyId: string, assertion: Uint8Array, payload: string): Promise<void> {
   const device = await env.DB.prepare("SELECT public_key, counter FROM devices WHERE key_id = ?")
     .bind(keyId)
     .first<{ public_key: string; counter: number }>();
