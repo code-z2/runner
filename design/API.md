@@ -144,7 +144,7 @@ Allow-list:
 
 | Contract | Method | Deposit | Max gas |
 |---|---|---|---|
-| `TREASURY_CONTRACT` (claims module) | `claim` | 0 | 200 Tgas |
+| `TREASURY_CONTRACT` (claims module) | `claim` | 0 | 300 Tgas |
 | `ESCROW_CONTRACT` | `unlock`, `flush_pool` | 0 | 100 Tgas |
 | `ESCROW_CONTRACT` | `give_up`, `withdraw`, `lock_from_balance` | 1 yoctoNEAR | 100 Tgas |
 | `TOKEN_CONTRACT` | `ft_transfer_call` with `receiver_id` = escrow | 1 yoctoNEAR | 100 Tgas |
@@ -222,50 +222,27 @@ The pool's money lives in a Sputnik DAO v2 (ORDER item 8: "Treasury on Sputnik/T
 
 ### The DAO
 
-Created from the Sputnik factory (`sputnik-v2.testnet` on testnet, `sputnik-dao.near` on mainnet). Policy:
+Created from the Sputnik factory (`sputnik-v2.testnet` on testnet, `sputnik-dao.near` on mainnet). Policy: the genesis file is [`apps/api/scripts/dao-policy.json`](/Users/peter/Developer/runner/apps/api/scripts/dao-policy.json) — the only definition that counts; `contracts/treasury` is the executable half.
 
-```json
-{
-  "roles": [
-    {
-      "name": "council",
-      "kind": { "Group": ["<joel>", "<peter>"] },
-      "permissions": ["*:*"],
-      "vote_policy": {}
-    },
-    {
-      "name": "claims",
-      "kind": { "Group": ["<claims module account>"] },
-      "permissions": ["transfer:AddProposal", "transfer:VoteApprove"],
-      "vote_policy": { "transfer": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 1] } }
-    }
-  ],
-  "default_vote_policy": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 2] },
-  "proposal_bond": "100000000000000000000000",
-  "proposal_period": "604800000000000",
-  "bounty_bond": "100000000000000000000000",
-  "bounty_forgiveness_period": "86400000000000"
-}
-```
-
-- Sputnik approves a proposal as soon as any one role reaches its threshold. The claims role has one member and a 1-of-1 threshold for `transfer`, so the module approves payouts alone and runners claim without waiting for votes.
-- The claims role can do nothing else: it cannot add or approve any other proposal kind.
-- Everything else needs the council: with two members and `[1, 2]`, both must approve. That covers policy, merchants, the attestor, pausing and any other movement of funds.
+- `claims` role (the claims module account only): 1-of-1 `transfer` approve, so payouts clear without waiting for votes. It can do nothing else.
+- `community` role (every runner, auto-joined on first successful claim): votes policy changes only, 5% quorum, 7-day window.
+- `council` (Peter + Joel, unanimous): pauses the module and `VoteRemove`s hostile proposals inside the window only — the timelock. A single rotation vote re-points the seeder/attestor everywhere.
 - The DAO must be registered with the stablecoin contract (`storage_deposit`) to hold it.
 
 ### Claims module (`contracts/treasury`)
 
 Setup: `new(dao_id, token_id, attestor_public_key, units_per_cent, proposal_bond)`. For USDC (6 decimals), `units_per_cent` is `10000`. `proposal_bond` must equal the DAO's `proposal_bond`.
 
-Runner call: `claim(attestation, signature, merchant_id, amount_cents)`, about 150 Tgas, sent by the runner's own account (directly or through the relayer).
+Runner call: `claim(attestation, signature, merchant_id, amount_cents)`, about 220 Tgas nested inside the 300 Tgas the app attaches, sent by the runner's own account through the relayer.
 
 1. Checks the attestor signature, version, caller, expiry, registered merchant, amount, and single use, then marks the pass used.
-2. Adds a DAO `Transfer` proposal (token, merchant, amount), attaching the bond from the module's own NEAR balance.
-3. Votes to approve it as the claims role. The DAO pays the merchant and returns the bond.
+2. On a first successful claim, proposes the runner into the `community` role (`AddMemberToRole`), bond from the module's own float.
+3. Adds a DAO `Transfer` proposal (token, merchant, amount), attaching the bond from the module's own NEAR balance.
+4. Votes to approve it as the claims role. The DAO pays the merchant and returns the bond.
 
-If the DAO refuses the proposal in step 2, the pass is freed for a retry. If step 3 fails, the proposal stays open for the council and the pass stays used, so it can never be paid twice. If the DAO's token transfer itself fails (for example the merchant is not registered with the token), Sputnik marks the proposal Failed and anyone can re-run it with `act_proposal(id, "Finalize")` once fixed.
+If the DAO refuses the proposal in step 3, the pass is freed for a retry. If step 4 fails, the proposal stays open for the council and the pass stays used, so it can never be paid twice. If the DAO's token transfer itself fails (for example the merchant is not registered with the token), Sputnik marks the proposal Failed and anyone can re-run it with `act_proposal(id, "Finalize")` once fixed.
 
-DAO calls (through council `FunctionCall` proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_proposal_bond`, `set_dao`, `pause`, `unpause`.
+DAO calls (through council `FunctionCall` proposals): `add_merchant`, `remove_merchant`, `set_attestor`, `set_seeder`, `set_proposal_bond`, `set_dao`, `pause`, `unpause`. Views: `get_attestor()`, `get_seeder()` — the server reads both per request, so one vote rotates keys and seeding everywhere.
 
 One attestor for the whole system: the module holds the only copy of the attestor key and exposes it with `get_attestor()`. The goal escrow reads it from there on every unlock, so one council vote changes the key for both contracts.
 
