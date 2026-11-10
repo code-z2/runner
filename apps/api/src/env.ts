@@ -12,6 +12,7 @@ export interface Env {
   DAO_ACCOUNT: string;
   RELAYER_ACCOUNT_ID: string;
   RELAYER_SECRET_KEY: string;
+  SEEDER_SECRET_KEY: string;
   PORTAL_ORIGIN: string;
   MAIL_FROM: string;
   ATTESTOR_SECRET_KEY: string;

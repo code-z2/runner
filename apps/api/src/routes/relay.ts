@@ -29,7 +29,10 @@ type Policy = Record<string, Record<string, Rule>>;
 function policy(env: Env): Policy {
   const call = (deposit: bigint, tgas: bigint, receivers?: string[]): Rule => ({ deposit, maxGas: tgas * TGAS, receivers });
   return {
-    [env.TREASURY_CONTRACT]: { claim: call(0n, 200n) },
+    // Claim carries the membership chain for first-time runners: payout
+    // proposal (20T) + approval step with the membership add/approve
+    // nested inside (220T). The app attaches 300 Tgas.
+    [env.TREASURY_CONTRACT]: { claim: call(0n, 300n) },
     [env.ESCROW_CONTRACT]: {
       unlock: call(0n, 100n),
       flush_pool: call(0n, 100n),
@@ -85,7 +88,7 @@ async function recordRelay(env: Env, senderId: string, keyId: string): Promise<v
   }
 }
 
-function outcome(result: Record<string, unknown>): { status: "succeeded" | "failed"; failure?: unknown } {
+export function outcome(result: Record<string, unknown>): { status: "succeeded" | "failed"; failure?: unknown } {
   const status = result.status as Record<string, unknown> | undefined;
   const receipts = (result.receipts_outcome as { outcome?: { status?: Record<string, unknown> } }[] | undefined) ?? [];
   const failure =

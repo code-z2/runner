@@ -6,6 +6,7 @@ import { nowSeconds, requireSettings, type Env } from "../env";
 import { isCell } from "../geohash";
 import { HttpError, json, parseObject, readJson, stringField } from "../http";
 import { isAccountId, isFullAccessKey, parsePublicKey, verifyNep413 } from "../near";
+import { ensureSeeded } from "./seed";
 
 const CHALLENGE_TTL_S = 300;
 const MAX_CELLS = 9;
@@ -94,6 +95,11 @@ export async function createAttestation(request: Request, env: Env): Promise<Res
   }
   const activity = parseActivity(content.activity);
   const challenge = await consumeChallenge(env, stringField(content, "challenge", 64));
+
+  // A fresh implicit account does not exist on-chain yet and the
+  // full-access check below would fail closed. Fund it from the DAO
+  // seeder first; an existing account is untouched.
+  await ensureSeeded(env, accountId);
 
   await checkDevice(env, keyId, assertion, payload);
   const signed = verifyNep413({

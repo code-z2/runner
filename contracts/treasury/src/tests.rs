@@ -5,7 +5,7 @@ use near_sdk::testing_env;
 
 const NOW_S: u64 = 1_800_000_000;
 const NONCE: &str = "0101010101010101010101010101010101010101010101010101010101010101";
-const DAO: &str = "runner.sputnik-dao.near";
+const DAO: &str = "ije.sputnik-dao.near";
 const BOND: u128 = 100_000_000_000_000_000_000_000;
 
 fn attestor() -> SigningKey {
@@ -28,7 +28,7 @@ fn account(name: &str) -> AccountId {
 
 fn set_caller(caller: &str) {
     testing_env!(VMContextBuilder::new()
-        .current_account_id(account("treasury.runner.near"))
+        .current_account_id(account("treasury.ije.near"))
         .predecessor_account_id(account(caller))
         .block_timestamp(NOW_S * NANOS_PER_SECOND)
         .account_balance(NearToken::from_near(10))
@@ -43,6 +43,8 @@ fn setup() -> Treasury {
         attestor_public_key(),
         U128(10_000),
         U128(BOND),
+        account("seeder.ije.near"),
+        U128(5_000_000_000_000_000_000_000),
     );
     treasury.add_merchant(account("mamaput.near"));
     treasury
@@ -58,7 +60,7 @@ fn pass(account_id: &str, max_amount_cents: u32, expires_at: u64, nonce: &str) -
 }
 
 fn valid_pass() -> (String, Base64VecU8) {
-    pass("runner.near", 256, NOW_S + 7200, NONCE)
+    pass("runner.ije.near", 256, NOW_S + 7200, NONCE)
 }
 
 fn transfer(amount: u128) -> ProposalKind {
@@ -73,7 +75,7 @@ fn transfer(amount: u128) -> ProposalKind {
 #[test]
 fn claim_marks_the_pass_used() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 150);
     assert!(treasury.is_nonce_used(NONCE.to_string()));
@@ -83,7 +85,7 @@ fn claim_marks_the_pass_used() {
 #[should_panic(expected = "attestation already used")]
 fn claim_rejects_a_second_use() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation.clone(), signature.clone(), account("mamaput.near"), 100);
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
@@ -93,7 +95,7 @@ fn claim_rejects_a_second_use() {
 #[should_panic(expected = "invalid attestor signature")]
 fn claim_rejects_a_changed_attestation() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation.replace("256", "500"), signature, account("mamaput.near"), 400);
 }
@@ -111,8 +113,8 @@ fn claim_rejects_someone_elses_pass() {
 #[should_panic(expected = "attestation expired")]
 fn claim_rejects_an_expired_pass() {
     let mut treasury = setup();
-    set_caller("runner.near");
-    let (attestation, signature) = pass("runner.near", 256, NOW_S, NONCE);
+    set_caller("runner.ije.near");
+    let (attestation, signature) = pass("runner.ije.near", 256, NOW_S, NONCE);
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
 }
 
@@ -120,7 +122,7 @@ fn claim_rejects_an_expired_pass() {
 #[should_panic(expected = "unknown merchant")]
 fn claim_rejects_unregistered_merchants() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("random.near"), 100);
 }
@@ -129,7 +131,7 @@ fn claim_rejects_unregistered_merchants() {
 #[should_panic(expected = "amount must be between 1 cent and the attested maximum")]
 fn claim_rejects_more_than_the_maximum() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 257);
 }
@@ -138,7 +140,7 @@ fn claim_rejects_more_than_the_maximum() {
 #[should_panic(expected = "amount must be between 1 cent and the attested maximum")]
 fn claim_rejects_zero() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 0);
 }
@@ -148,7 +150,7 @@ fn claim_rejects_zero() {
 fn claim_stops_while_paused() {
     let mut treasury = setup();
     treasury.pause();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
 }
@@ -157,9 +159,9 @@ fn claim_stops_while_paused() {
 #[should_panic(expected = "invalid attestation")]
 fn claim_rejects_extra_fields() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let attestation = format!(
-        "{{\"v\":1,\"account_id\":\"runner.near\",\"activity_hash\":\"x\",\"max_amount_cents\":100,\"expires_at\":{},\"nonce\":\"{NONCE}\",\"bonus\":1}}",
+        "{{\"v\":1,\"account_id\":\"runner.ije.near\",\"activity_hash\":\"x\",\"max_amount_cents\":100,\"expires_at\":{},\"nonce\":\"{NONCE}\",\"bonus\":1}}",
         NOW_S + 7200
     );
     let signature = Base64VecU8(attestor().sign(attestation.as_bytes()).to_bytes().to_vec());
@@ -183,11 +185,12 @@ fn a_payout_proposal_matches_what_sputnik_expects() {
 #[test]
 fn an_added_proposal_moves_on_to_approval() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 150);
-    set_caller("treasury.runner.near");
-    let next = treasury.on_proposal_added(NONCE.to_string(), transfer(1_500_000), Ok(7));
+    set_caller("treasury.ije.near");
+    let next =
+        treasury.on_proposal_added(NONCE.to_string(), transfer(1_500_000), account("runner.ije.near"), Ok(7));
     assert!(matches!(next, PromiseOrValue::Promise(_)));
     assert!(treasury.is_nonce_used(NONCE.to_string()));
 }
@@ -195,11 +198,16 @@ fn an_added_proposal_moves_on_to_approval() {
 #[test]
 fn a_proposal_the_dao_refuses_frees_the_pass_for_retry() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 150);
-    set_caller("treasury.runner.near");
-    let next = treasury.on_proposal_added(NONCE.to_string(), transfer(1_500_000), Err(PromiseError::Failed));
+    set_caller("treasury.ije.near");
+    let next = treasury.on_proposal_added(
+        NONCE.to_string(),
+        transfer(1_500_000),
+        account("runner.ije.near"),
+        Err(PromiseError::Failed),
+    );
     assert!(matches!(next, PromiseOrValue::Value(false)));
     assert!(!treasury.is_nonce_used(NONCE.to_string()));
 }
@@ -207,19 +215,27 @@ fn a_proposal_the_dao_refuses_frees_the_pass_for_retry() {
 #[test]
 fn an_approved_claim_keeps_the_pass_used() {
     let mut treasury = setup();
-    set_caller("treasury.runner.near");
-    assert!(treasury.on_proposal_approved(NONCE.to_string(), 7, Ok(())));
+    set_caller("treasury.ije.near");
+    let next =
+        treasury.on_proposal_approved(NONCE.to_string(), 7, account("runner.ije.near"), Ok(()));
+    assert!(matches!(next, PromiseOrValue::Promise(_)));
     assert!(get_logs()[0].contains("approved as DAO proposal 7"));
 }
 
 #[test]
 fn an_unapproved_proposal_is_left_for_the_council_and_never_reissued() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 150);
-    set_caller("treasury.runner.near");
-    assert!(!treasury.on_proposal_approved(NONCE.to_string(), 7, Err(PromiseError::Failed)));
+    set_caller("treasury.ije.near");
+    let next = treasury.on_proposal_approved(
+        NONCE.to_string(),
+        7,
+        account("runner.ije.near"),
+        Err(PromiseError::Failed),
+    );
+    assert!(matches!(next, PromiseOrValue::Value(false)));
     assert!(treasury.is_nonce_used(NONCE.to_string()));
     assert!(get_logs()[0].contains("council must approve or reject"));
 }
@@ -228,7 +244,7 @@ fn an_unapproved_proposal_is_left_for_the_council_and_never_reissued() {
 #[should_panic(expected = "only the DAO can do this")]
 fn only_the_dao_adds_merchants() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     treasury.add_merchant(account("fake.near"));
 }
 
@@ -236,7 +252,7 @@ fn only_the_dao_adds_merchants() {
 #[should_panic(expected = "only the DAO can do this")]
 fn only_the_dao_changes_the_attestor() {
     let mut treasury = setup();
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     treasury.set_attestor(key_of(&SigningKey::from_bytes(&[9u8; 32])));
 }
 
@@ -249,7 +265,7 @@ fn the_dao_manages_merchants_bond_and_attestor() {
     treasury.set_proposal_bond(U128(1));
     let rotated = key_of(&SigningKey::from_bytes(&[9u8; 32]));
     treasury.set_attestor(rotated.clone());
-    set_caller("escrow.runner.near");
+    set_caller("escrow.ije.near");
     assert_eq!(treasury.get_attestor(), rotated);
     assert_eq!(treasury.get_config().proposal_bond, U128(1));
 }
@@ -259,7 +275,7 @@ fn the_dao_manages_merchants_bond_and_attestor() {
 fn the_old_attestor_stops_working_after_rotation() {
     let mut treasury = setup();
     treasury.set_attestor(key_of(&SigningKey::from_bytes(&[9u8; 32])));
-    set_caller("runner.near");
+    set_caller("runner.ije.near");
     let (attestation, signature) = valid_pass();
     let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
 }
@@ -267,11 +283,11 @@ fn the_old_attestor_stops_working_after_rotation() {
 #[test]
 fn moving_to_a_new_dao_hands_over_control() {
     let mut treasury = setup();
-    treasury.set_dao(account("new.sputnik-dao.near"));
-    set_caller("new.sputnik-dao.near");
+    treasury.set_dao(account("other.sputnik-dao.near"));
+    set_caller("other.sputnik-dao.near");
     treasury.add_merchant(account("bole.near"));
     assert!(treasury.is_merchant(account("bole.near")));
-    assert_eq!(treasury.get_config().dao_id, account("new.sputnik-dao.near"));
+    assert_eq!(treasury.get_config().dao_id, account("other.sputnik-dao.near"));
 }
 
 #[test]
@@ -283,4 +299,85 @@ fn config_reports_the_dao_and_attestor() {
     assert_eq!(config.units_per_cent, U128(10_000));
     assert_eq!(config.proposal_bond, U128(BOND));
     assert!(!config.paused);
+}
+
+#[test]
+fn a_membership_proposal_matches_what_sputnik_expects() {
+    let kind = ProposalKind::AddMemberToRole { member_id: account("runner.ije.near"), role: "community".into() };
+    let json = serde_json::to_value(&ProposalInput { description: "runner join runner.ije.near".into(), kind })
+        .unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "description": "runner join runner.ije.near",
+            "kind": { "AddMemberToRole": { "member_id": "runner.ije.near", "role": "community" } }
+        })
+    );
+}
+
+#[test]
+fn first_successful_claim_proposes_membership() {
+    let mut treasury = setup();
+    set_caller("treasury.ije.near");
+    assert!(!treasury.is_member(account("runner.ije.near")));
+    let next =
+        treasury.on_proposal_approved(NONCE.to_string(), 7, account("runner.ije.near"), Ok(()));
+    assert!(matches!(next, PromiseOrValue::Promise(_)));
+    assert!(treasury.is_member(account("runner.ije.near")));
+}
+
+#[test]
+fn repeat_claims_skip_membership() {
+    let mut treasury = setup();
+    set_caller("treasury.ije.near");
+    let _ =
+        treasury.on_proposal_approved(NONCE.to_string(), 7, account("runner.ije.near"), Ok(()));
+    let next =
+        treasury.on_proposal_approved("00".repeat(32), 8, account("runner.ije.near"), Ok(()));
+    assert!(matches!(next, PromiseOrValue::Value(true)));
+}
+
+#[test]
+fn a_refused_membership_keeps_the_claim_and_retries_next_time() {
+    let mut treasury = setup();
+    set_caller("treasury.ije.near");
+    let next = treasury.on_membership_proposed(
+        account("runner.ije.near"),
+        ProposalKind::AddMemberToRole { member_id: account("runner.ije.near"), role: "community".into() },
+        Err(PromiseError::Failed),
+    );
+    assert!(matches!(next, PromiseOrValue::Value(true)));
+    assert!(!treasury.is_member(account("runner.ije.near")));
+}
+
+#[test]
+fn an_approved_membership_keeps_the_runner_joined() {
+    let mut treasury = setup();
+    set_caller("treasury.ije.near");
+    let _ =
+        treasury.on_proposal_approved(NONCE.to_string(), 7, account("runner.ije.near"), Ok(()));
+    assert!(treasury.on_membership_approved(account("runner.ije.near"), Ok(())));
+    assert!(treasury.is_member(account("runner.ije.near")));
+    assert!(get_logs().iter().any(|log| log.contains("joined the DAO community")));
+}
+
+#[test]
+#[should_panic(expected = "only the DAO can do this")]
+fn only_the_dao_rotates_the_seeder() {
+    let mut treasury = setup();
+    set_caller("runner.ije.near");
+    treasury.set_seeder(account("evil.near"), U128(1), true);
+}
+
+#[test]
+fn the_dao_owns_seeder_config_and_views_report_it() {
+    let mut treasury = setup();
+    let seeder = treasury.get_seeder();
+    assert_eq!(seeder.account_id, account("seeder.ije.near"));
+    assert_eq!(seeder.amount, U128(5_000_000_000_000_000_000_000));
+    assert!(seeder.enabled);
+    treasury.set_seeder(account("seeder2.ije.near"), U128(1), false);
+    let rotated = treasury.get_seeder();
+    assert_eq!(rotated.account_id, account("seeder2.ije.near"));
+    assert!(!rotated.enabled);
 }

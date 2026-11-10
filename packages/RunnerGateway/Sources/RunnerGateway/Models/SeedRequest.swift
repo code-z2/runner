@@ -6,8 +6,8 @@
 //
 
 /// Seed request. The account ID is the runner's implicit address; the
-/// server checks existence and funds it once. Same SIWA + App Attest
-/// guards as claims, minus the run proof.
+/// server checks existence and funds it once. Same device +
+/// key-ownership guards as claims, minus the run proof.
 public struct SeedRequest: Sendable, Equatable, Encodable {
 
   public let accountID: String

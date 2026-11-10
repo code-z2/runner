@@ -70,7 +70,7 @@ struct GatewayClientTests {
     let transport = MockHTTPTransport()
     let (client, _) = try self.client(transport: transport)
     let inner = try json([
-      "v": 1, "account_id": "runner.near", "activity_hash": "deadbeef",
+      "v": 1, "account_id": "runner.ije.near", "activity_hash": "deadbeef",
       "max_amount_cents": 256, "expires_at": 1_761_000_000, "nonce": "n-1",
     ])
     await transport.enqueue(
@@ -83,7 +83,7 @@ struct GatewayClientTests {
         nearPublicKey: "ed25519:abc", nearSignature: "sig"
       )
     )
-    #expect(pass.accountID == "runner.near")
+    #expect(pass.accountID == "runner.ije.near")
     #expect(pass.maxAmountCents == 256)
     #expect(pass.activityHash == "deadbeef")
     let request = await transport.lastRequest

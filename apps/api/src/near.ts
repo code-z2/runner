@@ -102,6 +102,19 @@ export async function isFullAccessKey(rpcUrl: string, accountId: string, publicK
   return (await viewAccessKey(rpcUrl, accountId, publicKey))?.fullAccess === true;
 }
 
+export interface AccountView {
+  amount: bigint;
+  locked: bigint;
+}
+
+export async function viewAccount(rpcUrl: string, accountId: string): Promise<AccountView | null> {
+  const result = await rpcQuery(rpcUrl, { request_type: "view_account", account_id: accountId });
+  if (!result || typeof result.amount !== "string") {
+    return null;
+  }
+  return { amount: BigInt(result.amount as string), locked: BigInt((result.locked as string | undefined) ?? "0") };
+}
+
 export async function rpcCall(rpcUrl: string, method: string, params: unknown): Promise<{ result?: Record<string, unknown>; error?: Record<string, unknown> }> {
   let response: Response;
   try {

@@ -30,8 +30,8 @@ interface Sent {
 
 function delegateFor(overrides: Partial<DelegateAction> = {}, call: Partial<DelegateAction["actions"][0]> = {}): DelegateAction {
   return {
-    senderId: "runner.near",
-    receiverId: "escrow.runner.near",
+    senderId: "runner.ije.near",
+    receiverId: "escrow.ije.near",
     actions: [
       {
         methodName: "give_up",
@@ -57,7 +57,7 @@ describe("delegate encoding", () => {
   test("round-trips a signed delegate action", () => {
     const delegate = delegateFor();
     const decoded = decodeSignedDelegate(Buffer.from(signDelegate(delegate), "base64"));
-    expect(decoded.delegate.senderId).toBe("runner.near");
+    expect(decoded.delegate.senderId).toBe("runner.ije.near");
     expect(decoded.delegate.actions[0].methodName).toBe("give_up");
     expect(decoded.delegate.actions[0].deposit).toBe(1n);
     expect(decoded.delegate.nonce).toBe(2n);
@@ -88,10 +88,10 @@ describe("POST /v1/relay", () => {
       const body = JSON.parse(String(init.body));
       if (body.method === "query") {
         const { account_id: account, public_key: key } = body.params;
-        if (account === "runner.near" && key === userKeyText) {
+        if (account === "runner.ije.near" && key === userKeyText) {
           return Response.json({ result: { nonce: 1, permission: "FullAccess", block_hash: zeroHash, block_height: 100 } });
         }
-        if (account === "relayer.runner.near" && key === relayerKeyText) {
+        if (account === "relayer.ije.near" && key === relayerKeyText) {
           return Response.json({ result: { nonce: 5, permission: "FullAccess", block_hash: zeroHash, block_height: 100 } });
         }
         return Response.json({ result: { error: "access key does not exist" } });
@@ -142,7 +142,7 @@ describe("POST /v1/relay", () => {
     expect(result.transaction_hash).toBe(base58.encode(hash(transaction)));
     expect(Buffer.from(transaction.slice(transaction.length - delegateBytes.length)).equals(delegateBytes)).toBe(true);
     expect(transaction[transaction.length - delegateBytes.length - 1]).toBe(8);
-    const nonceOffset = 4 + "relayer.runner.near".length + 33;
+    const nonceOffset = 4 + "relayer.ije.near".length + 33;
     expect(new DataView(transaction.buffer, transaction.byteOffset).getBigUint64(nonceOffset, true)).toBe(6n);
   });
 
@@ -151,7 +151,7 @@ describe("POST /v1/relay", () => {
       { receiverId: "usdc.near" },
       {
         methodName: "ft_transfer_call",
-        args: utf8(JSON.stringify({ receiver_id: "escrow.runner.near", amount: "25000000", msg: "{\"distance_m\":10000}" })),
+        args: utf8(JSON.stringify({ receiver_id: "escrow.ije.near", amount: "25000000", msg: "{\"distance_m\":10000}" })),
       },
     );
     expect((await post(signDelegate(delegate))).status).toBe(200);
@@ -178,18 +178,28 @@ describe("POST /v1/relay", () => {
     expect(await response.json()).toEqual({ error: "deposit_not_allowed" });
   });
 
-  test("lets a claim through the DAO use up to 200 Tgas", async () => {
+  test("lets a claim through the DAO use up to 300 Tgas", async () => {
     const delegate = delegateFor(
-      { receiverId: "treasury.runner.near" },
-      { methodName: "claim", args: utf8(JSON.stringify({ attestation: "{}", signature: "", merchant_id: "mamaput.near", amount_cents: 100 })), gas: 150_000_000_000_000n, deposit: 0n },
+      { receiverId: "treasury.ije.near" },
+      { methodName: "claim", args: utf8(JSON.stringify({ attestation: "{}", signature: "", merchant_id: "mamaput.near", amount_cents: 100 })), gas: 250_000_000_000_000n, deposit: 0n },
     );
     expect((await post(signDelegate(delegate))).status).toBe(200);
+  });
+
+  test("refuses a claim above 300 Tgas", async () => {
+    const delegate = delegateFor(
+      { receiverId: "treasury.ije.near" },
+      { methodName: "claim", args: utf8(JSON.stringify({ attestation: "{}", signature: "", merchant_id: "mamaput.near", amount_cents: 100 })), gas: 301_000_000_000_000n, deposit: 0n },
+    );
+    const response = await post(signDelegate(delegate));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "gas_not_allowed" });
   });
 
   test("lets anyone donate to the DAO pool with a plain transfer", async () => {
     const delegate = delegateFor(
       { receiverId: "usdc.near" },
-      { methodName: "ft_transfer", args: utf8(JSON.stringify({ receiver_id: "runner.sputnik-dao.near", amount: "5000000" })), gas: 10_000_000_000_000n },
+      { methodName: "ft_transfer", args: utf8(JSON.stringify({ receiver_id: "ije.sputnik-dao.near", amount: "5000000" })), gas: 10_000_000_000_000n },
     );
     expect((await post(signDelegate(delegate))).status).toBe(200);
   });
@@ -205,7 +215,7 @@ describe("POST /v1/relay", () => {
   test("no longer sends tokens into the claims module", async () => {
     const delegate = delegateFor(
       { receiverId: "usdc.near" },
-      { methodName: "ft_transfer_call", args: utf8(JSON.stringify({ receiver_id: "treasury.runner.near", amount: "1", msg: "" })) },
+      { methodName: "ft_transfer_call", args: utf8(JSON.stringify({ receiver_id: "treasury.ije.near", amount: "1", msg: "" })) },
     );
     expect(await (await post(signDelegate(delegate))).json()).toEqual({ error: "call_not_allowed" });
   });
@@ -238,7 +248,7 @@ describe("POST /v1/relay", () => {
 
   test("limits each account to 30 relays an hour", async () => {
     for (let i = 0; i < 30; i++) {
-      await env.DB.prepare("INSERT INTO relay_log (sender_id, key_id, created_at) VALUES ('runner.near', 'other', ?)")
+      await env.DB.prepare("INSERT INTO relay_log (sender_id, key_id, created_at) VALUES ('runner.ije.near', 'other', ?)")
         .bind(nowSeconds())
         .run();
     }
@@ -294,13 +304,13 @@ describe("byte compatibility with near-api-js", () => {
     const { buildRelayTransaction, parseRelayerKey } = await import("../src/nearTx");
     const key = parseRelayerKey(`ed25519:${base58.encode(new Uint8Array([...relayerSecret, ...relayerPublic]))}`);
     const signedDelegate = Buffer.from(signDelegate(delegateFor()), "base64");
-    const built = buildRelayTransaction({ relayerId: "relayer.runner.near", key, nonce: 6n, blockHash: new Uint8Array(32), signedDelegate });
+    const built = buildRelayTransaction({ relayerId: "relayer.ije.near", key, nonce: 6n, blockHash: new Uint8Array(32), signedDelegate });
     const decoded = near.decodeSignedTransaction(built.signedTransaction);
-    expect(decoded.transaction.signerId).toBe("relayer.runner.near");
-    expect(decoded.transaction.receiverId).toBe("runner.near");
+    expect(decoded.transaction.signerId).toBe("relayer.ije.near");
+    expect(decoded.transaction.receiverId).toBe("runner.ije.near");
     expect(BigInt(decoded.transaction.nonce)).toBe(6n);
     const inner = decoded.transaction.actions[0].signedDelegate;
-    expect(inner?.delegateAction.senderId).toBe("runner.near");
+    expect(inner?.delegateAction.senderId).toBe("runner.ije.near");
     expect(inner?.delegateAction.actions[0].functionCall?.methodName).toBe("give_up");
   });
 });

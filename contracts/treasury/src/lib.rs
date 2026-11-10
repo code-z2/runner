@@ -7,16 +7,26 @@ use near_sdk::{
 };
 
 const GAS_FOR_ADD_PROPOSAL: Gas = Gas::from_tgas(20);
-const GAS_FOR_APPROVE_STEP: Gas = Gas::from_tgas(95);
+const GAS_FOR_APPROVE_STEP: Gas = Gas::from_tgas(220);
 const GAS_FOR_ACT_PROPOSAL: Gas = Gas::from_tgas(70);
 const GAS_FOR_RESOLVE: Gas = Gas::from_tgas(10);
+/// Approval callback budget: own exec plus the membership `add_proposal`
+/// and its approval chain for first-time runners.
+const GAS_FOR_APPROVED_CB: Gas = Gas::from_tgas(140);
+const GAS_FOR_MEMBERSHIP_STEP: Gas = Gas::from_tgas(100);
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
+
+/// DAO role every claiming runner joins. Auto-membership rides the
+/// first successful claim; the council never votes anyone in.
+const COMMUNITY_ROLE: &str = "community";
 
 #[near(serializers = [borsh])]
 #[derive(BorshStorageKey)]
 enum StorageKey {
     Merchants,
     UsedNonces,
+    Seeder,
+    Joined,
 }
 
 #[near(contract_state)]
@@ -30,6 +40,25 @@ pub struct Treasury {
     paused: bool,
     merchants: LookupSet<AccountId>,
     used_nonces: LookupSet<[u8; 32]>,
+    seeder: Seeder,
+    joined: LookupSet<AccountId>,
+}
+
+/// Seed subsidy for first-time runners. Read by the server per request,
+/// so one DAO vote rotates the funder, the amount, or kills seeding
+/// without a deploy or a secret ceremony.
+#[near(serializers = [borsh])]
+struct Seeder {
+    account_id: AccountId,
+    amount: u128,
+    enabled: bool,
+}
+
+#[near(serializers = [json])]
+pub struct SeederView {
+    pub account_id: AccountId,
+    pub amount: U128,
+    pub enabled: bool,
 }
 
 #[derive(Deserialize)]
@@ -62,6 +91,10 @@ pub enum ProposalKind {
         receiver_id: AccountId,
         amount: U128,
         msg: Option<String>,
+    },
+    AddMemberToRole {
+        member_id: AccountId,
+        role: String,
     },
 }
 
@@ -110,6 +143,8 @@ impl Treasury {
         attestor_public_key: PublicKey,
         units_per_cent: U128,
         proposal_bond: U128,
+        seeder_account_id: AccountId,
+        seed_amount: U128,
     ) -> Self {
         require!(units_per_cent.0 > 0, "units_per_cent must be positive");
         Self {
@@ -121,6 +156,8 @@ impl Treasury {
             paused: false,
             merchants: LookupSet::new(StorageKey::Merchants),
             used_nonces: LookupSet::new(StorageKey::UsedNonces),
+            seeder: Seeder { account_id: seeder_account_id, amount: seed_amount.0, enabled: true },
+            joined: LookupSet::new(StorageKey::Joined),
         }
     }
 
@@ -162,6 +199,7 @@ impl Treasury {
             amount: U128(amount),
             msg: None,
         };
+        let runner_id = env::predecessor_account_id();
         ext_dao::ext(self.dao_id.clone())
             .with_attached_deposit(NearToken::from_yoctonear(self.proposal_bond))
             .with_static_gas(GAS_FOR_ADD_PROPOSAL)
@@ -172,7 +210,7 @@ impl Treasury {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_APPROVE_STEP)
-                    .on_proposal_added(pass.nonce, kind),
+                    .on_proposal_added(pass.nonce, kind, runner_id),
             )
     }
 
@@ -181,6 +219,7 @@ impl Treasury {
         &mut self,
         nonce: String,
         kind: ProposalKind,
+        runner_id: AccountId,
         #[callback_result] proposal_id: Result<u64, PromiseError>,
     ) -> PromiseOrValue<bool> {
         match proposal_id {
@@ -195,8 +234,8 @@ impl Treasury {
                     .act_proposal(id, Action::VoteApprove, kind, None)
                     .then(
                         Self::ext(env::current_account_id())
-                            .with_static_gas(GAS_FOR_RESOLVE)
-                            .on_proposal_approved(nonce, id),
+                            .with_static_gas(GAS_FOR_APPROVED_CB)
+                            .on_proposal_approved(nonce, id, runner_id),
                     ),
             ),
         }
@@ -207,18 +246,89 @@ impl Treasury {
         &mut self,
         nonce: String,
         proposal_id: u64,
+        runner_id: AccountId,
         #[callback_result] result: Result<(), PromiseError>,
-    ) -> bool {
+    ) -> PromiseOrValue<bool> {
         match result {
-            Ok(()) => {
-                env::log_str(&format!("claim {nonce} approved as DAO proposal {proposal_id}"));
-                true
-            }
             Err(_) => {
                 env::log_str(&format!(
                     "claim {nonce} is DAO proposal {proposal_id} but was not approved; the council must approve or reject it"
                 ));
-                false
+                PromiseOrValue::Value(false)
+            }
+            Ok(()) => {
+                env::log_str(&format!("claim {nonce} approved as DAO proposal {proposal_id}"));
+                if self.joined.contains(&runner_id) {
+                    return PromiseOrValue::Value(true);
+                }
+                self.joined.insert(runner_id.clone());
+                let kind = ProposalKind::AddMemberToRole {
+                    member_id: runner_id.clone(),
+                    role: COMMUNITY_ROLE.to_string(),
+                };
+                PromiseOrValue::Promise(
+                    ext_dao::ext(self.dao_id.clone())
+                        .with_attached_deposit(NearToken::from_yoctonear(self.proposal_bond))
+                        .with_static_gas(GAS_FOR_ADD_PROPOSAL)
+                        .add_proposal(ProposalInput {
+                            description: format!("runner join {runner_id}"),
+                            kind: kind.clone(),
+                        })
+                        .then(
+                            Self::ext(env::current_account_id())
+                                .with_static_gas(GAS_FOR_MEMBERSHIP_STEP)
+                                .on_membership_proposed(runner_id, kind),
+                        ),
+                )
+            }
+        }
+    }
+
+    #[private]
+    pub fn on_membership_proposed(
+        &mut self,
+        runner_id: AccountId,
+        kind: ProposalKind,
+        #[callback_result] proposal_id: Result<u64, PromiseError>,
+    ) -> PromiseOrValue<bool> {
+        match proposal_id {
+            Err(_) => {
+                self.joined.remove(&runner_id);
+                env::log_str(&format!(
+                    "runner {runner_id} stays out of the DAO: membership proposal rejected; next claim retries"
+                ));
+                PromiseOrValue::Value(true)
+            }
+            Ok(id) => PromiseOrValue::Promise(
+                ext_dao::ext(self.dao_id.clone())
+                    .with_static_gas(GAS_FOR_ACT_PROPOSAL)
+                    .act_proposal(id, Action::VoteApprove, kind, None)
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_FOR_RESOLVE)
+                            .on_membership_approved(runner_id),
+                    ),
+            ),
+        }
+    }
+
+    #[private]
+    pub fn on_membership_approved(
+        &mut self,
+        runner_id: AccountId,
+        #[callback_result] result: Result<(), PromiseError>,
+    ) -> bool {
+        match result {
+            Ok(()) => {
+                env::log_str(&format!("runner {runner_id} joined the DAO community"));
+                true
+            }
+            Err(_) => {
+                self.joined.remove(&runner_id);
+                env::log_str(&format!(
+                    "runner {runner_id} membership needs council action; next claim retries"
+                ));
+                true
             }
         }
     }
@@ -246,6 +356,23 @@ impl Treasury {
     pub fn set_dao(&mut self, dao_id: AccountId) {
         self.assert_dao();
         self.dao_id = dao_id;
+    }
+
+    pub fn set_seeder(&mut self, account_id: AccountId, amount: U128, enabled: bool) {
+        self.assert_dao();
+        self.seeder = Seeder { account_id, amount: amount.0, enabled };
+    }
+
+    pub fn get_seeder(&self) -> SeederView {
+        SeederView {
+            account_id: self.seeder.account_id.clone(),
+            amount: U128(self.seeder.amount),
+            enabled: self.seeder.enabled,
+        }
+    }
+
+    pub fn is_member(&self, account_id: AccountId) -> bool {
+        self.joined.contains(&account_id)
     }
 
     pub fn pause(&mut self) {

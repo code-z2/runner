@@ -11,6 +11,7 @@ import {
 } from "./routes/merchant";
 import { relay } from "./routes/relay";
 import { createAttestation, createChallenge, listMerchants, registerDevice } from "./routes/runner";
+import { seedAccount } from "./routes/seed";
 
 const ATTESTED_RETENTION_S = 3 * 24 * 3600;
 const LOCATION_PATH = /^\/v1\/merchant\/locations\/([0-9a-f-]{36})$/;
@@ -35,6 +36,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   if (method === "POST" && pathname === "/v1/attestations") return createAttestation(request, env);
   if (method === "GET" && pathname === "/v1/merchants") return listMerchants(url, env);
   if (method === "POST" && pathname === "/v1/relay") return relay(request, env);
+  if (method === "POST" && pathname === "/v1/seed") return seedAccount(request, env);
 
   if (method === "POST" && pathname === "/v1/merchant/login") return requestLogin(request, env);
   if (method === "POST" && pathname === "/v1/merchant/session") return createSession(request, env);

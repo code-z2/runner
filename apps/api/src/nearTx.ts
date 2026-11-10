@@ -4,6 +4,7 @@ import { concat, hash, utf8 } from "./codec";
 import { HttpError } from "./http";
 
 const ACTION_FUNCTION_CALL = 2;
+const ACTION_TRANSFER = 3;
 const ACTION_DELEGATE = 8;
 const KEY_ED25519 = 0;
 const NEP366_TAG = 2 ** 30 + 366;
@@ -240,6 +241,32 @@ export function parseRelayerKey(text: string): RelayerKey {
   const publicKey = ed25519.getPublicKey(secret);
   if (publicKey.some((byte, i) => byte !== raw[32 + i])) throw failure;
   return { secret, publicKey, publicKeyText: `ed25519:${base58.encode(publicKey)}` };
+}
+
+export function buildTransferTransaction(input: {
+  senderId: string;
+  key: RelayerKey;
+  nonce: bigint;
+  blockHash: Uint8Array;
+  receiverId: string;
+  amount: bigint;
+}): { signedTransaction: Uint8Array; hash: string } {
+  const writer = new Writer().string(input.senderId);
+  writePublicKey(writer, input.key.publicKey);
+  writer
+    .u64(input.nonce)
+    .string(input.receiverId)
+    .fixed(input.blockHash)
+    .u32(1)
+    .u8(ACTION_TRANSFER)
+    .u128(input.amount);
+  const transaction = writer.done();
+  const transactionHash = hash(transaction);
+  const signature = ed25519.sign(transactionHash, input.key.secret);
+  return {
+    signedTransaction: new Writer().fixed(transaction).u8(KEY_ED25519).fixed(signature).done(),
+    hash: base58.encode(transactionHash),
+  };
 }
 
 export function buildRelayTransaction(input: {

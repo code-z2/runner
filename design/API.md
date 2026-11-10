@@ -52,7 +52,7 @@ In:
 
 ```json
 {
-  "payload": "{\"account_id\":\"runner.near\",\"challenge\":\"<base64>\",\"activity\":{...}}",
+  "payload": "{\"account_id\":\"runner.ije.near\",\"challenge\":\"<base64>\",\"activity\":{...}}",
   "key_id": "<base64>",
   "assertion": "<base64>",
   "near_public_key": "ed25519:<base58>",
@@ -97,7 +97,7 @@ Out `201`:
 
 ```json
 {
-  "attestation": "{\"v\":1,\"account_id\":\"runner.near\",\"activity_hash\":\"<hex>\",\"max_amount_cents\":256,\"expires_at\":1762418530,\"nonce\":\"<hex>\"}",
+  "attestation": "{\"v\":1,\"account_id\":\"runner.ije.near\",\"activity_hash\":\"<hex>\",\"max_amount_cents\":256,\"expires_at\":1762418530,\"nonce\":\"<hex>\"}",
   "signature": "<base64 ed25519 signature over the attestation bytes>"
 }
 ```

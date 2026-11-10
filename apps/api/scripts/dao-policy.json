@@ -1,0 +1,57 @@
+{
+  "roles": [
+    {
+      "name": "council",
+      "kind": { "Group": ["REPLACE_WITH_PETER_ACCOUNT", "REPLACE_WITH_JOEL_ACCOUNT"] },
+      "permissions": [
+        "FunctionCall:AddProposal",
+        "FunctionCall:VoteApprove",
+        "ChangePolicy:VoteRemove",
+        "FunctionCall:VoteRemove",
+        "AddMemberToRole:VoteRemove",
+        "RemoveMemberFromRole:VoteRemove"
+      ],
+      "vote_policy": {
+        "FunctionCall": { "weight_kind": "RoleWeight", "quorum": "2", "threshold": [2, 2] },
+        "ChangePolicy": { "weight_kind": "RoleWeight", "quorum": "2", "threshold": [2, 2] },
+        "AddMemberToRole": { "weight_kind": "RoleWeight", "quorum": "2", "threshold": [2, 2] },
+        "RemoveMemberFromRole": { "weight_kind": "RoleWeight", "quorum": "2", "threshold": [2, 2] }
+      }
+    },
+    {
+      "name": "community",
+      "kind": { "Group": [] },
+      "permissions": [
+        "ChangePolicy:AddProposal",
+        "ChangePolicy:VoteApprove",
+        "ChangePolicy:VoteRemove",
+        "FunctionCall:AddProposal",
+        "FunctionCall:VoteApprove",
+        "FunctionCall:VoteRemove"
+      ],
+      "vote_policy": {
+        "ChangePolicy": { "weight_kind": "RoleWeight", "quorum": "3", "threshold": [1, 2] },
+        "FunctionCall": { "weight_kind": "RoleWeight", "quorum": "3", "threshold": [1, 2] }
+      }
+    },
+    {
+      "name": "claims",
+      "kind": { "Group": ["REPLACE_WITH_TREASURY_ACCOUNT"] },
+      "permissions": [
+        "transfer:AddProposal",
+        "transfer:VoteApprove",
+        "AddMemberToRole:AddProposal",
+        "AddMemberToRole:VoteApprove"
+      ],
+      "vote_policy": {
+        "transfer": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 1] },
+        "AddMemberToRole": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 1] }
+      }
+    }
+  ],
+  "default_vote_policy": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": [1, 2] },
+  "proposal_bond": "100000000000000000000000",
+  "proposal_period": "604800000000000",
+  "bounty_bond": "100000000000000000000000",
+  "bounty_forgiveness_period": "86400000000000"
+}

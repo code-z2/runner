@@ -15,7 +15,7 @@ const appId = "TEAMID1234.com.runner.app";
 describe("verifyAssertion", () => {
   const secret = p256.utils.randomSecretKey();
   const publicKey = p256.getPublicKey(secret, false);
-  const clientData = utf8('{"account_id":"runner.near"}');
+  const clientData = utf8('{"account_id":"runner.ije.near"}');
 
   test("accepts a valid assertion and returns the new counter", () => {
     const assertion = makeAssertion(secret, clientData, 5);
@@ -65,7 +65,7 @@ describe("NEP-413", () => {
   });
 
   test("checks account ids", () => {
-    expect(isAccountId("runner.near")).toBe(true);
+    expect(isAccountId("runner.ije.near")).toBe(true);
     expect(isAccountId("a".repeat(64))).toBe(true);
     expect(isAccountId("Runner.near")).toBe(false);
     expect(isAccountId("bad..near")).toBe(false);
@@ -76,7 +76,7 @@ describe("signClaimPass", () => {
   test("signs the exact attestation bytes", () => {
     const secret = new Uint8Array(32).fill(7);
     const pass = signClaimPass(
-      { accountId: "runner.near", activityHash: "ab".repeat(32), maxAmountCents: 256, expiresAt: 1_800_007_200 },
+      { accountId: "runner.ije.near", activityHash: "ab".repeat(32), maxAmountCents: 256, expiresAt: 1_800_007_200 },
       secret,
     );
     const fields = JSON.parse(pass.attestation);

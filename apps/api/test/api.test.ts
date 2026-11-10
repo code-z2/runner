@@ -35,13 +35,38 @@ function stubServices(rpc: Rpc): () => void {
       return Response.json({ id: "email-1" });
     }
     const params = body.params;
+    if (params.request_type === "view_account") {
+      return params.account_id === "runner.ije.near"
+        ? Response.json({ result: { amount: "1000000", locked: "0" } })
+        : Response.json({ error: { name: "HANDLER_ERROR", cause: { name: "UNKNOWN_ACCOUNT" } } });
+    }
     if (params.request_type === "view_access_key") {
       return rpc.fullAccessKeys.has(`${params.account_id}/${params.public_key}`)
         ? Response.json({ result: { nonce: 1, permission: "FullAccess", block_hash: "11111111111111111111111111111111", block_height: 100 } })
         : Response.json({ result: { error: "access key does not exist" } });
     }
+    if (body.method === "send_tx") {
+      return Response.json({
+        result: {
+          status: { SuccessValue: "" },
+          transaction: { hash: "seed-tx" },
+          transaction_outcome: { id: "seed-tx", outcome: { status: { SuccessValue: "" }, logs: [], gas_burnt: 1 } },
+          receipts_outcome: [],
+        },
+      });
+    }
     const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
-    const registered = params.account_id === "treasury.runner.near" && rpc.merchants.has(args.account_id);
+    if (params.method_name === "get_seeder") {
+      return Response.json({
+        result: {
+          result: Array.from(
+            utf8(JSON.stringify({ account_id: "seeder.ije.near", amount: "5000000000000000000000", enabled: true })),
+          ),
+          logs: [],
+        },
+      });
+    }
+    const registered = params.account_id === "treasury.ije.near" && rpc.merchants.has(args.account_id);
     return Response.json({ result: { result: Array.from(utf8(JSON.stringify(registered))), logs: [] } });
   });
 }
@@ -54,11 +79,17 @@ describe("runner flow", () => {
   const keyId = toBase64(new Uint8Array(32).fill(3));
   const nearSecret = ed25519.utils.randomSecretKey();
   const nearPublicKey = `ed25519:${base58.encode(ed25519.getPublicKey(nearSecret))}`;
+  const seederSecret = ed25519.utils.randomSecretKey();
+  const seederPublicKey = `ed25519:${base58.encode(ed25519.getPublicKey(seederSecret))}`;
   let counter = 0;
 
   beforeEach(async () => {
-    env = createEnv();
-    rpc = { fullAccessKeys: new Set([`runner.near/${nearPublicKey}`]), merchants: new Set(), mail: [] };
+    env = createEnv({ SEEDER_SECRET_KEY: `ed25519:${base58.encode(Buffer.concat([seederSecret, ed25519.getPublicKey(seederSecret)]))}` });
+    rpc = {
+      fullAccessKeys: new Set([`runner.ije.near/${nearPublicKey}`, `seeder.ije.near/${seederPublicKey}`]),
+      merchants: new Set(),
+      mail: [],
+    };
     restore = stubServices(rpc);
     counter = 0;
     await env.DB.prepare("INSERT INTO devices (key_id, public_key, counter, created_at) VALUES (?, ?, 0, 0)")
@@ -68,7 +99,7 @@ describe("runner flow", () => {
 
   afterEach(() => restore());
 
-  async function attest(activity: Record<string, unknown>, accountId = "runner.near"): Promise<Response> {
+  async function attest(activity: Record<string, unknown>, accountId = "runner.ije.near"): Promise<Response> {
     const { challenge } = (await (await call(env, "POST", "/v1/challenge")).json()) as { challenge: string };
     const payload = JSON.stringify({ account_id: accountId, challenge, activity });
     counter += 1;
@@ -100,7 +131,7 @@ describe("runner flow", () => {
     expect(response.status).toBe(201);
     const body = (await response.json()) as { attestation: string; signature: string };
     const pass = JSON.parse(body.attestation);
-    expect(pass.account_id).toBe("runner.near");
+    expect(pass.account_id).toBe("runner.ije.near");
     expect(pass.max_amount_cents).toBe(256);
     expect(pass.expires_at - nowSeconds()).toBeGreaterThan(7190);
     const attestorPublic = ed25519.getPublicKey(Buffer.from(env.ATTESTOR_SECRET_KEY, "base64"));
@@ -112,7 +143,7 @@ describe("runner flow", () => {
     const body = (await (await attest(run)).json()) as { run_proof: string; run_proof_signature: string };
     const proof = JSON.parse(body.run_proof);
     expect(Object.keys(proof)).toEqual(["v", "kind", "account_id", "activity_hash", "started_at", "ended_at", "distance_m", "active_seconds"]);
-    expect(proof).toMatchObject({ v: 1, kind: "run", account_id: "runner.near", distance_m: 5120, active_seconds: 1800, started_at: run.started_at });
+    expect(proof).toMatchObject({ v: 1, kind: "run", account_id: "runner.ije.near", distance_m: 5120, active_seconds: 1800, started_at: run.started_at });
     const attestorPublic = ed25519.getPublicKey(Buffer.from(env.ATTESTOR_SECRET_KEY, "base64"));
     expect(ed25519.verify(Buffer.from(body.run_proof_signature, "base64"), utf8(body.run_proof), attestorPublic)).toBe(true);
   });
@@ -144,7 +175,7 @@ describe("runner flow", () => {
 
   test("uses each challenge once", async () => {
     const { challenge } = (await (await call(env, "POST", "/v1/challenge")).json()) as { challenge: string };
-    const payload = JSON.stringify({ account_id: "runner.near", challenge, activity: activity(600) });
+    const payload = JSON.stringify({ account_id: "runner.ije.near", challenge, activity: activity(600) });
     const nonce = Buffer.from(challenge, "base64");
     const request = (count: number) =>
       call(env, "POST", "/v1/attestations", {
