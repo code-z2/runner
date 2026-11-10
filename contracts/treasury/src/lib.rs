@@ -8,7 +8,6 @@ use near_sdk::{
 
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
 const GAS_FOR_RESOLVE: Gas = Gas::from_tgas(10);
-const GAS_FOR_ATTESTOR_SYNC: Gas = Gas::from_tgas(10);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 
@@ -25,7 +24,6 @@ pub struct Treasury {
     owner_id: AccountId,
     token_id: AccountId,
     attestor_public_key: [u8; 32],
-    escrow_id: Option<AccountId>,
     units_per_cent: u128,
     paused: bool,
     merchants: LookupSet<AccountId>,
@@ -49,7 +47,6 @@ pub struct Config {
     pub owner_id: AccountId,
     pub token_id: AccountId,
     pub attestor_public_key: PublicKey,
-    pub escrow_id: Option<AccountId>,
     pub units_per_cent: U128,
     pub paused: bool,
 }
@@ -58,12 +55,6 @@ pub struct Config {
 #[allow(dead_code)]
 trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
-}
-
-#[ext_contract(ext_escrow)]
-#[allow(dead_code)]
-trait GoalEscrow {
-    fn sync_attestor(&mut self, public_key: PublicKey);
 }
 
 fn ed25519_key(public_key: &PublicKey) -> [u8; 32] {
@@ -93,7 +84,6 @@ impl Treasury {
             owner_id,
             token_id,
             attestor_public_key: ed25519_key(&attestor_public_key),
-            escrow_id: None,
             units_per_cent: units_per_cent.0,
             paused: false,
             merchants: LookupSet::new(StorageKey::Merchants),
@@ -175,28 +165,6 @@ impl Treasury {
     pub fn set_attestor(&mut self, public_key: PublicKey) {
         self.assert_owner();
         self.attestor_public_key = ed25519_key(&public_key);
-        if self.escrow_id.is_some() {
-            self.push_attestor().detach();
-        }
-    }
-
-    pub fn set_escrow(&mut self, escrow_id: AccountId) {
-        self.assert_owner();
-        self.escrow_id = Some(escrow_id);
-        self.push_attestor().detach();
-    }
-
-    pub fn sync_escrow_attestor(&mut self) -> Promise {
-        require!(self.escrow_id.is_some(), "no escrow is linked");
-        self.push_attestor()
-    }
-
-    #[private]
-    pub fn on_attestor_synced(&mut self, #[callback_result] result: Result<(), PromiseError>) -> bool {
-        if result.is_err() {
-            env::log_str("escrow attestor sync failed; call sync_escrow_attestor to retry");
-        }
-        result.is_ok()
     }
 
     pub fn set_owner(&mut self, owner_id: AccountId) {
@@ -231,33 +199,20 @@ impl Treasury {
         self.used_nonces.contains(&parse_nonce(&nonce))
     }
 
-    pub fn get_config(&self) -> Config {
-        Config {
-            owner_id: self.owner_id.clone(),
-            token_id: self.token_id.clone(),
-            attestor_public_key: self.attestor_key(),
-            escrow_id: self.escrow_id.clone(),
-            units_per_cent: U128(self.units_per_cent),
-            paused: self.paused,
-        }
-    }
-
-    fn attestor_key(&self) -> PublicKey {
+    pub fn get_attestor(&self) -> PublicKey {
         let mut key = vec![0u8];
         key.extend_from_slice(&self.attestor_public_key);
         PublicKey::try_from(key).unwrap_or_else(|_| env::panic_str("stored attestor key is invalid"))
     }
 
-    fn push_attestor(&self) -> Promise {
-        let escrow_id = self.escrow_id.clone().unwrap_or_else(|| env::panic_str("no escrow is linked"));
-        ext_escrow::ext(escrow_id)
-            .with_static_gas(GAS_FOR_ATTESTOR_SYNC)
-            .sync_attestor(self.attestor_key())
-            .then(
-                Self::ext(env::current_account_id())
-                    .with_static_gas(GAS_FOR_RESOLVE)
-                    .on_attestor_synced(),
-            )
+    pub fn get_config(&self) -> Config {
+        Config {
+            owner_id: self.owner_id.clone(),
+            token_id: self.token_id.clone(),
+            attestor_public_key: self.get_attestor(),
+            units_per_cent: U128(self.units_per_cent),
+            paused: self.paused,
+        }
     }
 
     fn assert_owner(&self) {

@@ -252,11 +252,8 @@ impl Escrow {
         false
     }
 
-    pub fn sync_attestor(&mut self, public_key: PublicKey) {
-        require!(
-            env::predecessor_account_id() == self.treasury_id,
-            "only the treasury can change the attestor"
-        );
+    pub fn set_attestor(&mut self, public_key: PublicKey) {
+        self.assert_owner();
         self.attestor_public_key = ed25519_key(&public_key);
     }
 
