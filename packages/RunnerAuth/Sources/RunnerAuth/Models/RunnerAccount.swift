@@ -9,15 +9,21 @@ import Foundation
 import RunnerNear
 
 /// The assembled runner identity. Apple is required; the server session
-/// and NEAR session attach as they arrive.
+/// and NEAR session attach as they arrive. `localAccount` is the
+/// device-key account: present once generated, independent of any
+/// ceremony session, and the fallback whenever no session is linked.
 public struct RunnerAccount: Sendable, Equatable {
   public let apple: AppleIdentity
   public let serverSession: String?
   public let near: NearLink?
-  public init(apple: AppleIdentity, serverSession: String?, near: NearLink?) {
+  public let localAccount: NearAccount?
+  public init(
+    apple: AppleIdentity, serverSession: String?, near: NearLink?, localAccount: NearAccount? = nil
+  ) {
     self.apple = apple
     self.serverSession = serverSession
     self.near = near
+    self.localAccount = localAccount
   }
 }
 

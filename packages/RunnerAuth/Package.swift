@@ -9,7 +9,7 @@ let package = Package(
     .library(name: "RunnerAuthTesting", targets: ["RunnerAuthTesting"]),
   ],
   dependencies: [
-    .package(path: "../RunnerNear"),
+    .package(path: "../RunnerNear")
   ],
   targets: [
     .target(
@@ -28,6 +28,7 @@ let package = Package(
         "RunnerAuth",
         "RunnerAuthTesting",
         .product(name: "RunnerNear", package: "RunnerNear"),
+        .product(name: "RunnerNearTesting", package: "RunnerNear"),
       ],
       path: "Tests/RunnerAuthTests"
     ),

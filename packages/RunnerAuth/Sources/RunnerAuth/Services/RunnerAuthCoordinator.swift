@@ -71,7 +71,16 @@ public actor RunnerAuthCoordinator {
     } else {
       near = nil
     }
-    return RunnerAccount(apple: apple, serverSession: persisted.serverSession, near: near)
+    let localAccount: NearAccount?
+    if let accountID = persisted.nearLocalAccountID,
+      let publicKey = persisted.nearLocalPublicKey
+    {
+      localAccount = NearAccount(accountID: accountID, publicKey: publicKey)
+    } else {
+      localAccount = nil
+    }
+    return RunnerAccount(
+      apple: apple, serverSession: persisted.serverSession, near: near, localAccount: localAccount)
   }
 
   public func signOut() async throws {
