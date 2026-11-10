@@ -221,3 +221,66 @@ fn config_reports_the_attestor_key() {
     assert_eq!(config.units_per_cent, U128(10_000));
     assert!(!config.paused);
 }
+
+fn other_key() -> PublicKey {
+    let mut key = vec![0u8];
+    key.extend_from_slice(SigningKey::from_bytes(&[9u8; 32]).verifying_key().as_bytes());
+    PublicKey::try_from(key).unwrap()
+}
+
+#[test]
+fn the_dao_links_the_escrow() {
+    let mut treasury = setup();
+    treasury.set_escrow(account("escrow.runner.near"));
+    assert_eq!(treasury.get_config().escrow_id, Some(account("escrow.runner.near")));
+}
+
+#[test]
+#[should_panic(expected = "only the owner can do this")]
+fn only_the_dao_links_the_escrow() {
+    let mut treasury = setup();
+    set_caller("runner.near");
+    treasury.set_escrow(account("fake-escrow.near"));
+}
+
+#[test]
+fn rotating_the_attestor_updates_the_treasury_and_reaches_the_escrow() {
+    let mut treasury = setup();
+    treasury.set_escrow(account("escrow.runner.near"));
+    treasury.set_attestor(other_key());
+    assert_eq!(treasury.get_config().attestor_public_key, other_key());
+}
+
+#[test]
+#[should_panic(expected = "invalid attestor signature")]
+fn the_old_attestor_stops_working_after_rotation() {
+    let mut treasury = setup();
+    treasury.set_attestor(other_key());
+    set_caller("runner.near");
+    let (attestation, signature) = valid_pass();
+    let _ = treasury.claim(attestation, signature, account("mamaput.near"), 100);
+}
+
+#[test]
+#[should_panic(expected = "no escrow is linked")]
+fn syncing_needs_a_linked_escrow() {
+    let mut treasury = setup();
+    set_caller("anyone.near");
+    let _ = treasury.sync_escrow_attestor();
+}
+
+#[test]
+fn anyone_can_push_the_current_attestor_to_the_escrow() {
+    let mut treasury = setup();
+    treasury.set_escrow(account("escrow.runner.near"));
+    set_caller("anyone.near");
+    let _ = treasury.sync_escrow_attestor();
+}
+
+#[test]
+fn a_failed_sync_is_reported() {
+    let mut treasury = setup();
+    set_caller("treasury.runner.near");
+    assert!(!treasury.on_attestor_synced(Err(PromiseError::Failed)));
+    assert!(treasury.on_attestor_synced(Ok(())));
+}
