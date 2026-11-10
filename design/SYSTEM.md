@@ -429,18 +429,19 @@ Living record of what was built. Update on every completed item.
 ## 2026-11-10 - One attestor for treasury and escrow
 
 - Item: Peter's request that one DAO vote changes the attestor everywhere
-- What it is: the treasury is the only authority over the attestor key. It
-  links the escrow with set_escrow, pushes its key there on every set_attestor
-  vote, and anyone can retry with sync_escrow_attestor if a push fails. The
-  escrow's sync_attestor only accepts calls from the treasury contract; its
-  own DAO-only set_attestor is gone.
-- How it was done: cross-contract push with a logging callback; 7 new treasury
-  tests (25 total) and 3 new escrow tests (20 total), all passing in the pinned
+- What it is: the treasury holds the only attestor key and exposes it with a
+  public get_attestor view. The escrow stores no key; unlock checks the proof
+  locally, reads the key from the treasury, and verifies the signature in a
+  callback that re-checks the lock before paying. The escrow depends on the
+  treasury, not the other way round.
+- How it was done: Peter's suggestion over a first push-based version (which
+  needed the treasury to know the escrow and a resync path); cross-contract
+  view + private callback; treasury and escrow unit tests in the pinned
   cargo-near image
-- Why this way: one vote, no drift, while goal escrow funds stay in their own
-  contract apart from the pool (ORDER items 9 and 10); unlocks stay a single
-  local signature check
+- Why this way: one vote, no stored copies that can drift, no linking step at
+  deploy; unlocks are rare so the extra hop is cheap; goal escrow funds stay in
+  their own contract apart from the pool (ORDER items 9 and 10)
 - Importance: governance of the attestor now covers the whole money system
 - Metadata: contracts/treasury, contracts/escrow, design/API.md; 2026-11-10
-- Gaps: the release wasm build was cut short by low memory on this machine and
-  needs a rerun; deploy order is treasury, escrow, then DAO set_escrow
+- Gaps: release wasm build needs a rerun on a machine with free memory; deploy
+  order is treasury, then escrow with treasury_id
