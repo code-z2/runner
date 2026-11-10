@@ -115,6 +115,42 @@ public struct LiveNearCore: NearCoreFunctions, Sendable {
     }
   }
 
+  public func encodeDelegateAction(
+    senderID: String,
+    receiverID: String,
+    methodName: String,
+    argsJSON: String,
+    gas: UInt64,
+    depositYocto: String,
+    nonce: UInt64,
+    maxBlockHeight: UInt64,
+    publicKey: String
+  ) throws -> String {
+    try map {
+      try RunnerNearCore.encodeDelegateAction(
+        senderId: senderID,
+        receiverId: receiverID,
+        methodName: methodName,
+        argsJson: argsJSON,
+        gas: gas,
+        depositYocto: depositYocto,
+        nonce: nonce,
+        maxBlockHeight: maxBlockHeight,
+        publicKey: publicKey
+      )
+    }
+  }
+
+  public func nep366DigestHex(delegateB64: String) throws -> String {
+    try map { try RunnerNearCore.nep366DigestHex(delegateB64: delegateB64) }
+  }
+
+  public func encodeSignedDelegate(delegateB64: String, signatureB64: String) throws -> String {
+    try map {
+      try RunnerNearCore.encodeSignedDelegate(delegateB64: delegateB64, signatureB64: signatureB64)
+    }
+  }
+
   static func mapCore(_ error: RunnerNearCore.CoreError) -> NearError {
     switch error {
     case .InvalidInput(let message):

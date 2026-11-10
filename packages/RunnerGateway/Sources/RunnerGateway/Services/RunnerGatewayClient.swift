@@ -54,6 +54,11 @@ public struct RunnerGatewayClient: GatewayClient, Sendable {
     return try await send(urlRequest, as: SeedResult.self, success: 200)
   }
 
+  public func relay(_ request: RelayRequest) async throws -> RelayResult {
+    let urlRequest = try post(path: "v1/relay", body: request)
+    return try await send(urlRequest, as: RelayResult.self, success: 200)
+  }
+
   public func merchants(cells: [String]) async throws -> [MerchantLocation] {
     guard !cells.isEmpty else {
       throw GatewayError.invalidRequest("cells must not be empty")

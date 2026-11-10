@@ -21,5 +21,10 @@ public protocol GatewayClient: Sendable {
   /// returns `seeded: false`. A dry funder surfaces as `GatewayError.server`.
   func seed(_ request: SeedRequest) async throws -> SeedResult
 
+  /// Submit a signed NEP-366 delegate. Policy rejections arrive as
+  /// `GatewayError.server` with the relay's code (`call_not_allowed`,
+  /// `gas_not_allowed`, `too_many_relays`, ...).
+  func relay(_ request: RelayRequest) async throws -> RelayResult
+
   func merchants(cells: [String]) async throws -> [MerchantLocation]
 }

@@ -13,6 +13,10 @@ use near_api::types::{
 use near_api::types::crypto::KeyType;
 use near_api::types::transaction::{SignedTransaction, Transaction, TransactionV0};
 use near_api::types::transaction::actions::{Action, FunctionCallAction, TransferAction};
+use near_api::types::transaction::delegate_action::{
+    DelegateAction, NonDelegateAction, SignedDelegateAction,
+};
+use sha2::Digest as _;
 
 use crate::{CoreError, hex_decode};
 
@@ -137,6 +141,100 @@ pub fn attach_signature(
     let signed = SignedTransaction::new(signature, tx);
     let bytes = borsh::to_vec(&signed)
         .map_err(|e| CoreError::Crypto(format!("signed tx does not encode: {e}")))?;
+    Ok(B64.encode(bytes))
+}
+
+/// NEP-366 domain tag. Byte-exact with `delegateDigest` in
+/// `apps/api/src/nearTx.ts` — the server is the other half of this digest.
+const NEP366_TAG: u32 = (1 << 30) + 366;
+
+fn nep366_digest(delegate_raw: &[u8]) -> [u8; 32] {
+    let mut tagged = NEP366_TAG.to_le_bytes().to_vec();
+    tagged.extend_from_slice(delegate_raw);
+    sha2::Sha256::digest(tagged).into()
+}
+
+/// Build one NEP-366 delegate action (a single function call — the server
+/// rejects anything else) for the relay. Returns Borsh bytes as base64.
+/// Args ride as a JSON string, exactly like `TxAction::FunctionCall`.
+#[uniffi::export]
+pub fn encode_delegate_action(
+    sender_id: String,
+    receiver_id: String,
+    method_name: String,
+    args_json: String,
+    gas: u64,
+    deposit_yocto: String,
+    nonce: u64,
+    max_block_height: u64,
+    public_key: String,
+) -> Result<String, CoreError> {
+    // Validate JSON but pass the bytes through untouched: re-serialization
+    // would sort keys (BTreeMap) while the server signs insertion order.
+    let _: serde_json::Value = serde_json::from_str(&args_json)
+        .map_err(|e| CoreError::InvalidInput(format!("args are not JSON: {e}")))?;
+    let action = Action::FunctionCall(Box::new(FunctionCallAction {
+        method_name,
+        args: args_json.into_bytes(),
+        gas: NearGas::from_gas(gas),
+        deposit: NearToken::from_yoctonear(parse_u128("deposit", &deposit_yocto)?),
+    }));
+    let delegate = DelegateAction {
+        sender_id: parse_account("sender", &sender_id)?,
+        receiver_id: parse_account("receiver", &receiver_id)?,
+        actions: vec![
+            NonDelegateAction::try_from(action)
+                .map_err(|_| CoreError::InvalidInput("delegate holds one call".into()))?,
+        ],
+        nonce,
+        max_block_height,
+        public_key: parse_key(&public_key)?,
+    };
+    let bytes = borsh::to_vec(&delegate)
+        .map_err(|e| CoreError::Crypto(format!("delegate does not encode: {e}")))?;
+    Ok(B64.encode(bytes))
+}
+
+/// The 32-byte digest the device key signs. Hex.
+#[uniffi::export]
+pub fn nep366_digest_hex(delegate_b64: String) -> Result<String, CoreError> {
+    let raw = B64
+        .decode(delegate_b64)
+        .map_err(|e| CoreError::InvalidInput(format!("delegate is not base64: {e}")))?;
+    Ok(hex::encode(nep366_digest(&raw)))
+}
+
+/// Attach a 64-byte signature to a delegate. Returns signed Borsh as base64.
+/// Fails fast on wrong-key signatures, like `attach_signature`.
+#[uniffi::export]
+pub fn encode_signed_delegate(
+    delegate_b64: String,
+    signature_b64: String,
+) -> Result<String, CoreError> {
+    let raw = B64
+        .decode(&delegate_b64)
+        .map_err(|e| CoreError::InvalidInput(format!("delegate is not base64: {e}")))?;
+    let delegate: DelegateAction = borsh::from_slice(&raw)
+        .map_err(|e| CoreError::InvalidInput(format!("delegate does not decode: {e}")))?;
+    let sig_bytes = B64
+        .decode(&signature_b64)
+        .map_err(|e| CoreError::InvalidInput(format!("signature is not base64: {e}")))?;
+    if sig_bytes.len() != 64 {
+        return Err(CoreError::InvalidInput("signature is not 64 bytes".into()));
+    }
+    let signature = Signature::from_parts(KeyType::ED25519, &sig_bytes)
+        .map_err(|e| CoreError::InvalidInput(format!("signature malformed: {e}")))?;
+    if signature.verify(CryptoHash(nep366_digest(&raw)), delegate.public_key.clone()) == false {
+        return Err(CoreError::InvalidInput(
+            "signature does not match delegate public key".into(),
+        ));
+    }
+    let signed = SignedDelegateAction {
+        delegate_action: delegate,
+        signature,
+    };
+    let bytes = borsh::to_vec(&signed)
+        .map_err(|e| CoreError::Crypto(format!("signed delegate does not encode: {e}")))?;
     Ok(B64.encode(bytes))
 }
 
@@ -552,6 +650,85 @@ mod tests {
         let err = attach_signature(unsigned, B64.encode(sig.to_bytes()), OTHER_PUBKEY.into())
             .unwrap_err();
         assert!(matches!(err, CoreError::InvalidInput(_)));
+    }
+
+    // Golden vector from apps/api/src/nearTx.ts (bun /tmp/vectors.ts):
+    // claim call, gas 300T, deposit 0, nonce 2, max block 150.
+    const DELEGATE_ARGS_JSON: &str = r#"{"attestation":"AAA","signature":"BBB","merchant_id":"mamaput.near","amount_cents":100}"#;
+    const DELEGATE_PUBKEY: &str = "ed25519:GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
+    const DELEGATE_HEX: &str = "0a000000616c6963652e6e6561721100000074726561737572792e696a652e6e656172010000000205000000636c61696d570000007b226174746573746174696f6e223a22414141222c227369676e6174757265223a22424242222c226d65726368616e745f6964223a226d616d617075742e6e656172222c22616d6f756e745f63656e7473223a3130307d00c06e31d9100100000000000000000000000000000000000200000000000000960000000000000000ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c";
+    const DELEGATE_DIGEST_HEX: &str =
+        "a98b8631fdcb7b5e790fb310d572aa243bebdec748d5ac5b75262252587403bd";
+
+    fn claim_delegate() -> String {
+        encode_delegate_action(
+            "alice.near".into(),
+            "treasury.ije.near".into(),
+            "claim".into(),
+            DELEGATE_ARGS_JSON.into(),
+            300_000_000_000_000,
+            "0".into(),
+            2,
+            150,
+            DELEGATE_PUBKEY.into(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn delegate_encoding_matches_server_vector() {
+        let raw = B64.decode(claim_delegate()).unwrap();
+        assert_eq!(hex::encode(&raw), DELEGATE_HEX);
+    }
+
+    #[test]
+    fn delegate_digest_matches_server_vector() {
+        let digest = nep366_digest_hex(claim_delegate()).unwrap();
+        assert_eq!(digest, DELEGATE_DIGEST_HEX);
+    }
+
+    #[test]
+    fn signed_delegate_matches_server_vector() {
+        // Secret 32x 0x07 (same key as the vector script): sign, attach, compare.
+        let secret = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let digest = hex::decode(nep366_digest_hex(claim_delegate()).unwrap()).unwrap();
+        let sig = secret.sign(&digest);
+        let signed = encode_signed_delegate(claim_delegate(), B64.encode(sig.to_bytes())).unwrap();
+        let raw = B64.decode(signed).unwrap();
+        assert_eq!(
+            hex::encode(&raw),
+            "0a000000616c6963652e6e6561721100000074726561737572792e696a652e6e656172010000000205000000636c61696d570000007b226174746573746174696f6e223a22414141222c227369676e6174757265223a22424242222c226d65726368616e745f6964223a226d616d617075742e6e656172222c22616d6f756e745f63656e7473223a3130307d00c06e31d9100100000000000000000000000000000000000200000000000000960000000000000000ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c00532acf88f83870badb879e48e0e79f4979d1fe0cdd80a2c3367aa0731a59457087a46002958e6a6696aa72b672fa6c25053394e29096f5963dc45add5c4a1c0e"
+        );
+    }
+
+    #[test]
+    fn delegate_builders_reject_bad_input() {
+        assert!(encode_delegate_action(
+            "NOT AN ACCOUNT!!!".into(),
+            "treasury.ije.near".into(),
+            "claim".into(),
+            DELEGATE_ARGS_JSON.into(),
+            300_000_000_000_000,
+            "0".into(),
+            2,
+            150,
+            DELEGATE_PUBKEY.into(),
+        )
+        .is_err());
+        assert!(encode_delegate_action(
+            "alice.near".into(),
+            "treasury.ije.near".into(),
+            "claim".into(),
+            DELEGATE_ARGS_JSON.into(),
+            300_000_000_000_000,
+            "1.5".into(),
+            2,
+            150,
+            DELEGATE_PUBKEY.into(),
+        )
+        .is_err());
+        assert!(nep366_digest_hex("!!!".into()).is_err());
+        assert!(encode_signed_delegate(claim_delegate(), "!!!".into()).is_err());
     }
 
     #[test]

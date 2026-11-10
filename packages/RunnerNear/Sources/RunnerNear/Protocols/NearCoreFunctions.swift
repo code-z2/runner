@@ -44,4 +44,20 @@ public protocol NearCoreFunctions: Sendable {
 
   func attachSignature(unsignedBase64: String, signatureBase64: String, publicKey: String) throws
     -> String
+
+  func encodeDelegateAction(
+    senderID: String,
+    receiverID: String,
+    methodName: String,
+    argsJSON: String,
+    gas: UInt64,
+    depositYocto: String,
+    nonce: UInt64,
+    maxBlockHeight: UInt64,
+    publicKey: String
+  ) throws -> String
+
+  func nep366DigestHex(delegateB64: String) throws -> String
+
+  func encodeSignedDelegate(delegateB64: String, signatureB64: String) throws -> String
 }

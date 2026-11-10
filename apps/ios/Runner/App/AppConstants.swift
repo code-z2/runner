@@ -29,9 +29,8 @@ nonisolated enum AppConstants {
     URL(string: "https://\(associatedDomain)\(authCallbackPath)")!
   }
 
-  /// Reserved for the production relayer submitter. Until it lands,
-  /// chain submission stays a seam and nothing posts here.
+  /// The NEP-366 delegate endpoint behind `RunnerGatewayClient.relay(_:)`.
   static var nearRelayURL: URL {
-    URL(string: AppEnvironment.current.apiBaseURL + "/v1/near/relay")!
+    URL(string: AppEnvironment.current.apiBaseURL + "/v1/relay")!
   }
 }

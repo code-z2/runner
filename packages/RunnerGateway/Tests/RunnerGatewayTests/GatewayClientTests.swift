@@ -193,4 +193,48 @@ struct GatewayClientTests {
       try await client.seed(SeedRequest(accountID: "abc.near"))
     }
   }
+
+  @Test
+  func relayPostsSignedDelegate() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(
+      try json(["transaction_hash": "9abcdef", "status": "succeeded"]), status: 200)
+    let result = try await client.relay(
+      RelayRequest(signedDelegateB64: "AAAA", keyID: "key-1", assertionB64: "BBBB"))
+    #expect(result == RelayResult(transactionHash: "9abcdef", status: .succeeded))
+    let request = await transport.lastRequest
+    #expect(request?.url?.path == "/v1/relay")
+    let body = try #require(
+      request?.httpBody.flatMap {
+        try? JSONSerialization.jsonObject(with: $0) as? [String: String]
+      })
+    #expect(body["signed_delegate"] == "AAAA")
+    #expect(body["key_id"] == "key-1")
+    #expect(body["assertion"] == "BBBB")
+  }
+
+  @Test
+  func relayGasViolationMapsToCode() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(try json(["error": "gas_not_allowed"]), status: 422)
+    await #expect(throws: GatewayError.server(status: 422, code: "gas_not_allowed")) {
+      try await client.relay(
+        RelayRequest(signedDelegateB64: "AAAA", keyID: "key-1", assertionB64: "BBBB"))
+    }
+  }
+
+  @Test
+  func relayFailedOutcomeDecodes() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(
+      try json(["transaction_hash": "9abcdef", "status": "failed", "failure": ["x": 1]]),
+      status: 200)
+    let result = try await client.relay(
+      RelayRequest(signedDelegateB64: "AAAA", keyID: "key-1", assertionB64: "BBBB"))
+    #expect(result.status == .failed)
+    #expect(result.transactionHash == "9abcdef")
+  }
 }

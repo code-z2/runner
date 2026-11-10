@@ -359,6 +359,21 @@ RustBuffer uniffi_runner_near_core_fn_func_attach_signature(RustBuffer unsigned_
 RustBuffer uniffi_runner_near_core_fn_func_build_unsigned_tx(RustBuffer sender, RustBuffer receiver, RustBuffer public_key, uint64_t nonce, RustBuffer block_hash_hex, RustBuffer action, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_DELEGATE_ACTION
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_DELEGATE_ACTION
+RustBuffer uniffi_runner_near_core_fn_func_encode_delegate_action(RustBuffer sender_id, RustBuffer receiver_id, RustBuffer method_name, RustBuffer args_json, uint64_t gas, RustBuffer deposit_yocto, uint64_t nonce, uint64_t max_block_height, RustBuffer public_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_SIGNED_DELEGATE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_SIGNED_DELEGATE
+RustBuffer uniffi_runner_near_core_fn_func_encode_signed_delegate(RustBuffer delegate_b64, RustBuffer signature_b64, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_NEP366_DIGEST_HEX
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_NEP366_DIGEST_HEX
+RustBuffer uniffi_runner_near_core_fn_func_nep366_digest_hex(RustBuffer delegate_b64, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_TX_SIGNING_HASH
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_TX_SIGNING_HASH
 RustBuffer uniffi_runner_near_core_fn_func_tx_signing_hash(RustBuffer unsigned_b64, RustCallStatus *_Nonnull out_status
@@ -663,6 +678,24 @@ uint16_t uniffi_runner_near_core_checksum_func_attach_signature(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_BUILD_UNSIGNED_TX
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_BUILD_UNSIGNED_TX
 uint16_t uniffi_runner_near_core_checksum_func_build_unsigned_tx(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_DELEGATE_ACTION
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_DELEGATE_ACTION
+uint16_t uniffi_runner_near_core_checksum_func_encode_delegate_action(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_SIGNED_DELEGATE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_SIGNED_DELEGATE
+uint16_t uniffi_runner_near_core_checksum_func_encode_signed_delegate(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_NEP366_DIGEST_HEX
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_NEP366_DIGEST_HEX
+uint16_t uniffi_runner_near_core_checksum_func_nep366_digest_hex(void
     
 );
 #endif

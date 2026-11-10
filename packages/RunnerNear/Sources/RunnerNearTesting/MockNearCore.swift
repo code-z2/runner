@@ -48,6 +48,18 @@ public final class MockNearCore: NearCoreFunctions, Sendable {
     locked.with { $0.signedTx = value }
   }
 
+  public func scriptDelegate(_ value: String) {
+    locked.with { $0.delegate = value }
+  }
+
+  public func scriptDelegateDigest(_ value: String) {
+    locked.with { $0.delegateDigest = value }
+  }
+
+  public func scriptSignedDelegate(_ value: String) {
+    locked.with { $0.delegateSigned = value }
+  }
+
   public var recordedNep413Inputs: [(String, String, String)] {
     locked.with { $0.nep413Inputs }
   }
@@ -147,6 +159,54 @@ public final class MockNearCore: NearCoreFunctions, Sendable {
     }
   }
 
+  public func encodeDelegateAction(
+    senderID: String,
+    receiverID: String,
+    methodName: String,
+    argsJSON: String,
+    gas: UInt64,
+    depositYocto: String,
+    nonce: UInt64,
+    maxBlockHeight: UInt64,
+    publicKey: String
+  ) throws -> String {
+    try locked.with {
+      guard let value = $0.delegate else {
+        throw NearError.invalidInput("no delegate scripted")
+      }
+      $0.delegateInputs.append(
+        (
+          senderID, receiverID, methodName, argsJSON, gas, depositYocto, nonce, maxBlockHeight,
+          publicKey
+        ))
+      return value
+    }
+  }
+
+  public func nep366DigestHex(delegateB64: String) throws -> String {
+    try locked.with {
+      guard let value = $0.delegateDigest else {
+        throw NearError.invalidInput("no delegate digest scripted")
+      }
+      return value
+    }
+  }
+
+  public func encodeSignedDelegate(delegateB64: String, signatureB64: String) throws -> String {
+    try locked.with {
+      guard let value = $0.delegateSigned else {
+        throw NearError.invalidInput("no signed delegate scripted")
+      }
+      return value
+    }
+  }
+
+  public var recordedDelegateInputs:
+    [(String, String, String, String, UInt64, String, UInt64, UInt64, String)]
+  {
+    locked.with { $0.delegateInputs }
+  }
+
   private struct State {
     var nep413: String?
     var nep413Inputs: [(String, String, String)] = []
@@ -158,6 +218,11 @@ public final class MockNearCore: NearCoreFunctions, Sendable {
     var txHash: String?
     var signedTx: String?
     var txInputs: [(String, String, String, UInt64, String, String, String?)] = []
+    var delegate: String?
+    var delegateDigest: String?
+    var delegateSigned: String?
+    var delegateInputs: [(String, String, String, String, UInt64, String, UInt64, UInt64, String)] =
+      []
   }
 
   private final class Locked<T>: @unchecked Sendable {

@@ -185,6 +185,13 @@ New implicit accounts don't exist on-chain until first funded, and the relayer's
 - Slice: package only — typed models, `EscrowFunctions` seam, live RPC views, relayer submitter seam, mocks, Swift mirrors of the contract tests. Goals UI, audio engine, run reports stay later.
 - Deploy values (escrow/treasury/token accounts, `min_lock`) land from Joel's deployment; until then the package's placeholders are syntactically valid but nonexistent accounts, so every call fails closed at RPC.
 
+### 10b. Relay sender, live (AGREED 2026-11-10)
+
+- Chain bytes stay in Rust: `encode_delegate_action` / `nep366_digest_hex` / `encode_signed_delegate` in `runner-near-core`, byte-exact with `apps/api/src/nearTx.ts`, golden vectors from the server encoder. Rebuild via `rust/build-xcframework.sh` (outputs checked in).
+- Swift orchestration: `NearCoreFunctions` + `LiveNearCore` + `MockNearCore`; `RunnerGateway.relay(_:)` posts the signed delegate to `POST /v1/relay` (`RelayRequest`/`RelayResult`, failure detail stays onchain under the tx hash).
+- App flow per call: fetch nonce + block height (`NearRpc.accessKey`), build delegate (claim attaches up to 300 Tgas), sign with the device key, attest (`key_id` + `assertion`), POST. The composer lives app-layer (needs RPC + signer + gateway); packages stay seam-pure.
+- `AppConstants.nearRelayURL` corrected to `/v1/relay`.
+
 ## 11. Platform defaults (AGREED)
 
 - History: device only. Bests: device only.
