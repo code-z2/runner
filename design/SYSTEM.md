@@ -505,3 +505,24 @@ Living record of what was built. Update on every completed item.
   escrow unlock credited the balance)
 - Metadata: apps/api/wrangler.toml, design/DEPLOY.md; 2026-11-12
 - Gaps: proposal 0 still holds 1 NEAR until it expires and someone Finalizes it
+
+## 2026-11-12 - RunnerUI design package
+
+- Item: shared brand, fonts and colors for the SwiftUI screens (Peter's ask,
+  modelled on wades-app packages/ui)
+- What it is: packages/RunnerUI with Theme.Colors (ivory light look and night
+  dark look; the live, countdown and claim screens set the dark scheme),
+  Theme.Typography (Instrument Serif headings, system font body and metrics,
+  `.runnerText(...)`), Theme.Spacing, Radius, Sizing, Elevation
+  (`.runnerShadow(...)`), Theme.Brand and IjeWordmark, and `.pill(...)` buttons
+- How it was done: colors, sizes, tracking, radii and the tab bar shadow read
+  from Figma pass 2 through the plugin API; Inter in Figma stands in for the
+  system font; Instrument Serif Regular and Italic bundled from google/fonts
+  with OFL.txt and registered at first use
+- Why this way: same three-tier token setup as wades-app, so screens never use
+  raw colors or sizes
+- Importance: base for every screen in the UI phase
+- Metadata: packages/RunnerUI, design/brand; 2026-11-12
+- Gaps: not compiled yet (no Swift toolchain on the Windows machine); Peter
+  needs to run `swift test` in packages/RunnerUI and add the package to
+  apps/ios/Runner.xcodeproj
