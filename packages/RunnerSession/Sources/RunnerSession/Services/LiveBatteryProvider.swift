@@ -15,6 +15,7 @@
 
     public init() {}
 
+    @MainActor
     public func level() -> Float? {
       UIDevice.current.isBatteryMonitoringEnabled = true
       let level = UIDevice.current.batteryLevel

@@ -24,7 +24,7 @@ struct AuthFlowTests {
         .replacingOccurrences(of: "=", with: "")
     }
     let payload: [String: Any] = [
-      "iss": "https://appleid.apple.com", "aud": "app.runner", "sub": "apple-user-1",
+      "iss": "https://appleid.apple.com", "aud": "io.wades.ije", "sub": "apple-user-1",
       "exp": 9_999_999_999, "nonce": nonce,
     ]
     let body = String(data: try! JSONSerialization.data(withJSONObject: payload), encoding: .utf8)!
@@ -59,7 +59,7 @@ struct AuthFlowTests {
       provider: provider,
       coordinator: auth,
       redirectURI: "https://ije.wades.io/auth/callback",
-      appleAudience: "app.runner",
+      appleAudience: "io.wades.ije",
       resolveAccount: resolve)
     return (flow, auth, transport)
   }

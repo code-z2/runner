@@ -13,7 +13,7 @@ import os
 /// archive never carries identity in the clear. No tokens, ever.
 struct AuditLog: Sendable {
 
-  private let log = Logger(subsystem: "app.runner", category: "auth")
+  private let log = Logger(subsystem: "io.wades.ije", category: "auth")
 
   func signedIn(userID: String) {
     log.notice("sign-in ok user=\(userID, privacy: .private(mask: .hash))")

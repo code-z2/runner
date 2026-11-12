@@ -71,6 +71,16 @@ extension AppleSignInAdapter: ASAuthorizationControllerDelegate {
 extension AppleSignInAdapter: ASAuthorizationControllerPresentationContextProviding {
 
   func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-    anchor ?? ASPresentationAnchor()
+    if let anchor { return anchor }
+    // signIn always stores an anchor before the system asks for one, so this
+    // runs only in tests or on misuse. The app is foreground whenever a sheet
+    // presents, and the system calls this on the main thread.
+    let scene = MainActor.assumeIsolated {
+      UIApplication.shared.connectedScenes.first as? UIWindowScene
+    }
+    guard let scene else {
+      preconditionFailure("AppleSignInAdapter presented without an anchor")
+    }
+    return ASPresentationAnchor(windowScene: scene)
   }
 }

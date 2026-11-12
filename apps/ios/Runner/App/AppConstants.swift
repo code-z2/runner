@@ -12,8 +12,8 @@ nonisolated enum AppConstants {
   /// API version appended downstream of `AppEnvironment.apiBaseURL`.
   static let apiVersion = "v1"
 
-  /// Bundle identifier prefix for the app and its extensions.
-  static let bundlePrefix = "app.runner"
+  /// Apple audience for the native auth flow: the app's bundle ID.
+  static let bundlePrefix = "io.wades.ije"
 
   /// Associated domain host for HTTPS callbacks and universal links.
   /// Served with the `apple-app-site-association` file; every URL under

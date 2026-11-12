@@ -14,7 +14,7 @@ import SwiftData
 /// app shares history later. Device-only — no CloudKit, ever.
 struct AppDatabase: Sendable {
 
-  static let groupIdentifier = "group.app.runner"
+  static let groupIdentifier = "group.io.wades.ije"
 
   let container: ModelContainer
 

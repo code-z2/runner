@@ -27,7 +27,7 @@ struct AppleAuthTests {
   private func claims(nonce: String? = "hashed-nonce", exp: Int = 9_999_999_999) -> [String: Any] {
     var payload: [String: Any] = [
       "iss": "https://appleid.apple.com",
-      "aud": "app.runner",
+      "aud": "io.wades.ije",
       "sub": "apple-user-1",
       "exp": exp,
       "email": "runner@privaterelay.appleid.com",
@@ -54,7 +54,7 @@ struct AppleAuthTests {
     #expect(parsed.subject == "apple-user-1")
     #expect(parsed.email == "runner@privaterelay.appleid.com")
     #expect(parsed.emailVerified)
-    #expect(parsed.audience == "app.runner")
+    #expect(parsed.audience == "io.wades.ije")
     #expect(parsed.issuer == "https://appleid.apple.com")
     #expect(parsed.nonce == "hashed-nonce")
   }
@@ -62,7 +62,7 @@ struct AppleAuthTests {
   @Test
   func validatesHappyPath() throws {
     let parsed = try AppleAuth.claims(jwt: token(payload: claims()))
-    try AppleAuth.validate(parsed, audience: "app.runner", requestHash: "hashed-nonce")
+    try AppleAuth.validate(parsed, audience: "io.wades.ije", requestHash: "hashed-nonce")
   }
 
   @Test
@@ -71,25 +71,25 @@ struct AppleAuthTests {
     bad["iss"] = "https://evil.example.com"
     #expect(throws: AuthError.wrongIssuer) {
       try AppleAuth.validate(
-        AppleAuth.claims(jwt: token(payload: bad)), audience: "app.runner",
+        AppleAuth.claims(jwt: token(payload: bad)), audience: "io.wades.ije",
         requestHash: "hashed-nonce")
     }
     bad = claims()
     bad["aud"] = "other.app"
     #expect(throws: AuthError.wrongAudience) {
       try AppleAuth.validate(
-        AppleAuth.claims(jwt: token(payload: bad)), audience: "app.runner",
+        AppleAuth.claims(jwt: token(payload: bad)), audience: "io.wades.ije",
         requestHash: "hashed-nonce")
     }
     #expect(throws: AuthError.nonceMismatch) {
       try AppleAuth.validate(
-        AppleAuth.claims(jwt: token(payload: claims())), audience: "app.runner",
+        AppleAuth.claims(jwt: token(payload: claims())), audience: "io.wades.ije",
         requestHash: "other-hash")
     }
     bad = claims(exp: 1)
     #expect(throws: AuthError.tokenExpired) {
       try AppleAuth.validate(
-        AppleAuth.claims(jwt: token(payload: bad)), audience: "app.runner",
+        AppleAuth.claims(jwt: token(payload: bad)), audience: "io.wades.ije",
         requestHash: "hashed-nonce")
     }
   }

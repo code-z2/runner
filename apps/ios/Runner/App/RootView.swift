@@ -30,6 +30,9 @@ struct RootView: View {
 
   var body: some View {
     ZStack {
+#if DEBUG
+      StagingDriverView(app: app)
+#else
       switch navigation.route {
       case .launch:
         EmptyView()
@@ -38,6 +41,7 @@ struct RootView: View {
       case .home:
         EmptyView()
       }
+#endif
     }
     .task {
       await models.authState.resolve()

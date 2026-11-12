@@ -15,7 +15,7 @@ import Testing
 struct KeychainStoreTests {
 
   private func store() -> KeychainStore {
-    KeychainStore(service: "app.runner.auth.test.\(UUID().uuidString)")
+    KeychainStore(service: "io.wades.ije.auth.test.\(UUID().uuidString)")
   }
 
   @Test

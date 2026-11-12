@@ -2,7 +2,7 @@
   "roles": [
     {
       "name": "council",
-      "kind": { "Group": ["REPLACE_WITH_PETER_ACCOUNT", "REPLACE_WITH_JOEL_ACCOUNT"] },
+      "kind": { "Group": ["ije-dev.testnet", "ije-dev2.testnet"] },
       "permissions": [
         "FunctionCall:AddProposal",
         "FunctionCall:VoteApprove",
@@ -36,7 +36,7 @@
     },
     {
       "name": "claims",
-      "kind": { "Group": ["REPLACE_WITH_TREASURY_ACCOUNT"] },
+      "kind": { "Group": ["ije-v1-claims.testnet"] },
       "permissions": [
         "transfer:AddProposal",
         "transfer:VoteApprove",

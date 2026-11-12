@@ -12,7 +12,7 @@
 public struct RunnerAuth {
 
   /// Keychain service namespace. One blob, atomic.
-  public static let service = "app.runner.auth"
+  public static let service = "io.wades.ije.auth"
 
   /// Persisted account key. Versioned so rotation never collides.
   public static let accountKey = "runner.account.v1"
@@ -24,5 +24,5 @@ public struct RunnerAuth {
 
   /// Keychain access group for future Watch sharing. Reserved, unused
   /// until the Watch app target exists.
-  public static let accessGroup = "group.app.runner.auth"
+  public static let accessGroup = "group.io.wades.ije.auth"
 }
