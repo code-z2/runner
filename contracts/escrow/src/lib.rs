@@ -32,6 +32,17 @@ pub struct Goal {
     pub max_seconds: Option<u32>,
 }
 
+/// Deposit message for `ft_on_transfer`. Naming another account as `owner`
+/// locks the sender's own funds under that account's control, so it cannot
+/// steal: the named owner can only unlock by running, or give up (half to the
+/// pool). A bare `Goal` keeps the old meaning with `owner = sender`.
+#[derive(Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+struct DepositMsg {
+    owner: AccountId,
+    goal: Goal,
+}
+
 #[near(serializers = [borsh])]
 pub struct Lock {
     owner_id: AccountId,
@@ -56,6 +67,7 @@ pub struct Config {
     pub treasury_id: AccountId,
     pub pool_id: AccountId,
     pub min_lock: U128,
+    pub skew_bps: u32,
     pub pool_owed: U128,
 }
 
@@ -86,6 +98,14 @@ trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
+/// Default deposit skew tolerance: 500 bps (5%). Covers stablecoin intent
+/// slippage with margin while keeping the `min_lock` dust floor meaningful.
+const DEFAULT_SKEW_BPS: u32 = 500;
+/// Hard cap on the skew tolerance: 5000 bps (50%). Beyond this the minimum
+/// stops being a minimum.
+const MAX_SKEW_BPS: u32 = 5_000;
+const BPS_DENOMINATOR: u128 = 10_000;
+
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Escrow {
@@ -94,6 +114,7 @@ pub struct Escrow {
     treasury_id: AccountId,
     pool_id: AccountId,
     min_lock: u128,
+    skew_bps: u32,
     next_lock_id: u64,
     pool_owed: u128,
     locks: LookupMap<u64, Lock>,
@@ -142,6 +163,7 @@ impl Escrow {
             treasury_id,
             pool_id,
             min_lock: min_lock.0,
+            skew_bps: DEFAULT_SKEW_BPS,
             next_lock_id: 0,
             pool_owed: 0,
             locks: LookupMap::new(StorageKey::Locks),
@@ -151,22 +173,29 @@ impl Escrow {
     }
 
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        if env::predecessor_account_id() != self.token_id || amount.0 < self.min_lock {
+        if env::predecessor_account_id() != self.token_id || !self.meets_minimum(amount.0) {
             return PromiseOrValue::Value(amount);
         }
-        match serde_json::from_str::<Goal>(&msg) {
-            Ok(goal) if goal_is_valid(&goal) => {
-                self.create_lock(sender_id, amount.0, goal);
-                PromiseOrValue::Value(U128(0))
-            }
-            _ => PromiseOrValue::Value(amount),
+        // Owner-attributed deposit (intent solvers delivering for a user)
+        // first, bare Goal with owner = sender (relay path) second.
+        let (owner_id, goal) = match serde_json::from_str::<DepositMsg>(&msg) {
+            Ok(deposit) => (deposit.owner, deposit.goal),
+            Err(_) => match serde_json::from_str::<Goal>(&msg) {
+                Ok(goal) => (sender_id, goal),
+                Err(_) => return PromiseOrValue::Value(amount),
+            },
+        };
+        if !goal_is_valid(&goal) {
+            return PromiseOrValue::Value(amount);
         }
+        self.create_lock(owner_id, amount.0, goal);
+        PromiseOrValue::Value(U128(0))
     }
 
     #[payable]
     pub fn lock_from_balance(&mut self, amount: U128, goal: Goal) -> U64 {
         assert_one_yocto();
-        require!(amount.0 >= self.min_lock, "amount is below the minimum lock");
+        require!(self.meets_minimum(amount.0), "amount is below the minimum lock");
         require!(goal_is_valid(&goal), "invalid goal");
         let owner_id = env::predecessor_account_id();
         self.debit(&owner_id, amount.0);
@@ -288,6 +317,12 @@ impl Escrow {
         self.min_lock = min_lock.0;
     }
 
+    pub fn set_skew_bps(&mut self, skew_bps: u32) {
+        self.assert_owner();
+        require!(skew_bps <= MAX_SKEW_BPS, "skew_bps above maximum");
+        self.skew_bps = skew_bps;
+    }
+
     pub fn set_owner(&mut self, owner_id: AccountId) {
         self.assert_owner();
         self.owner_id = owner_id;
@@ -319,6 +354,7 @@ impl Escrow {
             treasury_id: self.treasury_id.clone(),
             pool_id: self.pool_id.clone(),
             min_lock: U128(self.min_lock),
+            skew_bps: self.skew_bps,
             pool_owed: U128(self.pool_owed),
         }
     }
@@ -347,6 +383,13 @@ impl Escrow {
         );
         self.locks_by_owner.entry(owner_id).or_default().push(id);
         id
+    }
+
+    /// Floor is `min_lock` less the skew tolerance, all integer math:
+    /// `amount * 10_000 >= min_lock * (10_000 - skew_bps)`.
+    fn meets_minimum(&self, amount: u128) -> bool {
+        amount.saturating_mul(BPS_DENOMINATOR)
+            >= self.min_lock.saturating_mul(BPS_DENOMINATOR - u128::from(self.skew_bps))
     }
 
     fn owned_lock(&self, lock_id: u64, owner_id: &AccountId) -> &Lock {

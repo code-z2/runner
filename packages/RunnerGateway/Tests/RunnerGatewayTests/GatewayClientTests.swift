@@ -164,15 +164,30 @@ struct GatewayClientTests {
     let transport = MockHTTPTransport()
     let (client, _) = try self.client(transport: transport)
     await transport.enqueue(try json(["seeded": true, "tx": "tx-1"]), status: 200)
-    let result = try await client.seed(SeedRequest(accountID: "abc.near"))
+    let request = SeedRequest(
+      accountID: "abc.near",
+      keyID: "key-1",
+      assertion: "assertion-1",
+      nearPublicKey: "ed25519:abc",
+      nearSignature: "sig-1"
+    )
+    let result = try await client.seed(request)
     #expect(result == SeedResult(seeded: true, txHash: "tx-1"))
-    let request = await transport.lastRequest
-    #expect(request?.httpMethod == "POST")
-    #expect(request?.url?.path == "/v1/seed")
-    let rawBody = try #require(request?.httpBody)
+    let sent = await transport.lastRequest
+    #expect(sent?.httpMethod == "POST")
+    #expect(sent?.url?.path == "/v1/seed")
+    let rawBody = try #require(sent?.httpBody)
     let decoded = try JSONSerialization.jsonObject(with: rawBody)
     let body = try #require(decoded as? [String: String])
-    #expect(body == ["account_id": "abc.near"])
+    #expect(
+      body == [
+        "account_id": "abc.near",
+        "key_id": "key-1",
+        "assertion": "assertion-1",
+        "near_public_key": "ed25519:abc",
+        "near_signature": "sig-1",
+      ]
+    )
   }
 
   @Test
@@ -180,7 +195,15 @@ struct GatewayClientTests {
     let transport = MockHTTPTransport()
     let (client, _) = try self.client(transport: transport)
     await transport.enqueue(try json(["seeded": false]), status: 200)
-    let result = try await client.seed(SeedRequest(accountID: "abc.near"))
+    let result = try await client.seed(
+      SeedRequest(
+        accountID: "abc.near",
+        keyID: "key-1",
+        assertion: "assertion-1",
+        nearPublicKey: "ed25519:abc",
+        nearSignature: "sig-1"
+      )
+    )
     #expect(result == SeedResult(seeded: false))
   }
 
@@ -190,7 +213,15 @@ struct GatewayClientTests {
     let (client, _) = try self.client(transport: transport)
     await transport.enqueue(try json(["error": "funder_dry"]), status: 503)
     await #expect(throws: GatewayError.server(status: 503, code: "funder_dry")) {
-      try await client.seed(SeedRequest(accountID: "abc.near"))
+      try await client.seed(
+        SeedRequest(
+          accountID: "abc.near",
+          keyID: "key-1",
+          assertion: "assertion-1",
+          nearPublicKey: "ed25519:abc",
+          nearSignature: "sig-1"
+        )
+      )
     }
   }
 

@@ -26,5 +26,7 @@ codegen-units = 1
 opt-level = "z"
 lto = true
 debug = false
-panic = "abort"
+# Unwind (not abort) so require!/panic_str messages surface on-chain.
+# Slightly larger wasm, but silent traps cost more in burned relay gas.
+panic = "unwind"
 overflow-checks = true

@@ -322,3 +322,108 @@ fn config_reports_where_the_pool_share_goes() {
     assert_eq!(config.treasury_id, account("treasury.ije.near"));
     assert_eq!(config.pool_id, account("ije.sputnik-dao.near"));
 }
+
+#[test]
+fn deposit_with_owner_in_message_attributes_the_named_account() {
+    // Intent solvers deliver via ft_transfer_call, so sender_id is the solver.
+    // The owner field redirects the lock to the user who paid for the swap.
+    let mut escrow = setup();
+    set_caller("usdc.near", LOCKED_AT_S, 0);
+    let msg = "{\"owner\":\"runner.ije.near\",\"goal\":{\"distance_m\":10000,\"max_seconds\":3300}}";
+    let result = escrow.ft_on_transfer(account("solver.1click.near"), U128(25 * USDC), msg.to_string());
+    assert!(matches!(result, PromiseOrValue::Value(U128(0))));
+    assert!(escrow.get_locks(account("solver.1click.near")).is_empty());
+    let locks = escrow.get_locks(account("runner.ije.near"));
+    assert_eq!(locks.len(), 1);
+    assert_eq!(locks[0].amount, U128(25 * USDC));
+    assert_eq!(locks[0].goal, Goal { distance_m: 10_000, max_seconds: Some(3_300) });
+}
+
+#[test]
+fn skew_band_accepts_just_below_minimum_and_rejects_below_the_band() {
+    // Default skew is 500 bps: floor for a 1 USDC minimum is 0.95 USDC.
+    let mut escrow = setup();
+    set_caller("usdc.near", LOCKED_AT_S, 0);
+    let in_band = escrow.ft_on_transfer(
+        account("runner.ije.near"),
+        U128(960_000),
+        "{\"distance_m\":10000}".to_string(),
+    );
+    assert!(matches!(in_band, PromiseOrValue::Value(U128(0))));
+    assert_eq!(escrow.get_locks(account("runner.ije.near")).len(), 1);
+    let below_band = escrow.ft_on_transfer(
+        account("runner.ije.near"),
+        U128(940_000),
+        "{\"distance_m\":10000}".to_string(),
+    );
+    assert!(matches!(below_band, PromiseOrValue::Value(U128(940_000))));
+    assert_eq!(escrow.get_locks(account("runner.ije.near")).len(), 1);
+}
+
+#[test]
+fn skew_bps_defaults_and_moves_the_band_when_the_owner_sets_it() {
+    let mut escrow = setup();
+    assert_eq!(escrow.get_config().skew_bps, 500);
+    // setup() leaves the owner as caller.
+    escrow.set_skew_bps(2_500);
+    assert_eq!(escrow.get_config().skew_bps, 2_500);
+    // Floor is now 0.75 USDC: 0.76 locks, and the band is visibly wider.
+    set_caller("usdc.near", LOCKED_AT_S, 0);
+    let in_band = escrow.ft_on_transfer(
+        account("runner.ije.near"),
+        U128(760_000),
+        "{\"distance_m\":10000}".to_string(),
+    );
+    assert!(matches!(in_band, PromiseOrValue::Value(U128(0))));
+}
+
+#[test]
+#[should_panic(expected = "skew_bps above maximum")]
+fn skew_bps_is_capped_so_the_minimum_stays_a_minimum() {
+    let mut escrow = setup();
+    escrow.set_skew_bps(5_001);
+}
+
+#[test]
+#[should_panic(expected = "only the owner can do this")]
+fn only_the_owner_can_set_skew_bps() {
+    let mut escrow = setup();
+    set_caller("mallory.ije.near", LOCKED_AT_S, 0);
+    escrow.set_skew_bps(1_000);
+}
+
+#[test]
+fn lock_from_balance_honors_the_skew_band() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.ije.near", 25 * USDC);
+    set_caller("runner.ije.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.ije.near", LOCKED_AT_S + 3_600, 10_020, 3_250);
+    unlock(&mut escrow, id, text, signature);
+    set_caller("runner.ije.near", LOCKED_AT_S + 86_400, 1);
+    let goal = Goal { distance_m: 5_000, max_seconds: None };
+    escrow.lock_from_balance(U128(960_000), goal.clone());
+    assert_eq!(escrow.get_locks(account("runner.ije.near")).len(), 1);
+}
+
+#[test]
+#[should_panic(expected = "amount is below the minimum lock")]
+fn lock_from_balance_rejects_below_the_skew_band() {
+    let mut escrow = setup();
+    let id = lock_10k_under_55(&mut escrow, "runner.ije.near", 25 * USDC);
+    set_caller("runner.ije.near", LOCKED_AT_S + 86_400, 0);
+    let (text, signature) = proof("runner.ije.near", LOCKED_AT_S + 3_600, 10_020, 3_250);
+    unlock(&mut escrow, id, text, signature);
+    set_caller("runner.ije.near", LOCKED_AT_S + 86_400, 1);
+    let goal = Goal { distance_m: 5_000, max_seconds: None };
+    escrow.lock_from_balance(U128(940_000), goal);
+}
+
+#[test]
+fn unlock_args_require_string_ids_like_the_live_relay_sends() {
+    // Regression test: near-sdk `U64` deserializes ONLY from JSON strings.
+    // The DEBUG driver once sent `"lock_id":0` (a number), which trapped
+    // on-chain with no message — the app must always quote the id.
+    let ok: U64 = serde_json::from_str(r#""0""#).unwrap();
+    assert_eq!(ok.0, 0);
+    assert!(serde_json::from_str::<U64>("0").is_err());
+}

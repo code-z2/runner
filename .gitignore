@@ -74,5 +74,5 @@ __pycache__/
 
 target/
 
-# DEBUG-only simulator ceremony proof; lives on disk, never committed.
-apps/ios/Runner/App/ProofHarness.swift
+# DEBUG-only E2E harnesses (StagingDriver, ProofHarness); live on disk, never committed.
+apps/ios/E2E/
