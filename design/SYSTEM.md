@@ -183,6 +183,7 @@ Living record of what was built. Update on every completed item.
   D1 runner-api (62403d0b-151e-480d-8775-f1be4a325256, WEUR) with schema,
   hourly cleanup cron, ATTESTOR_SECRET_KEY stored as a secret. Attestor
   public key: ed25519:5nkc2NppUmiqBDaZYKjsgXigejTzmNzXeRzY336BXcUb
+  (retired 2026-11-10, see "v1 accounts live" below)
 - How it was done: wrangler 4.158.0 on account f1e022c6d9e3a80eeb1bd8b7e4b28385;
   key made by `bun run rotate-attestor`, secret never printed; settings now
   checked per feature (503 misconfigured) so challenge and discovery work
@@ -484,3 +485,23 @@ Living record of what was built. Update on every completed item.
   and serif type; Peter asked for a less obtrusive claim pass and a single wallet
 - Importance: visual target for the SwiftUI screens
 - Metadata: https://www.figma.com/design/3pOXDAoe1amTH89MBf2ymP, design/photos; 2026-11-10
+
+## 2026-11-12 - v1 accounts live
+
+- Item: runner-api moved onto Peter's v1 contracts
+- What it is: DAO ije-v1.sputnik-v2.testnet, claims module ije-v1-claims.testnet,
+  escrow ije-v1-escrow.testnet; relayer stays ije-relayer.testnet. Attestor
+  public key is now ed25519:6hzVqMovzZJKF28grcG1wM8iuoLHsNdTPKDxoWDhZEH3; the
+  2026-11-08 key ed25519:5nkc2Npp... is retired and nothing checks it
+- How it was done: Peter made a new attestor key and set ATTESTOR_SECRET_KEY at
+  the v1 deploy (2026-11-10 22:25 UTC); DAO proposal 1 set the policy with
+  snake_case permission labels, council *:Finalize and a fixed 3-vote community
+  rule; proposal 2 set the claims bond to 0.1 NEAR; proposal 3 added merchant
+  mamaput.testnet; worker version 89709716 points at the v1 accounts
+- Why this way: proposal 0 used labels Sputnik does not match and would have
+  locked the DAO; an empty group with quorum 0 counts as approved on Finalize,
+  so the default vote policy has quorum 1
+- Importance: Peter's e2e passed on these accounts (claim paid the merchant,
+  escrow unlock credited the balance)
+- Metadata: apps/api/wrangler.toml, design/DEPLOY.md; 2026-11-12
+- Gaps: proposal 0 still holds 1 NEAR until it expires and someone Finalizes it
