@@ -490,7 +490,7 @@ Living record of what was built. Update on every completed item.
 
 - Item: runner-api moved onto Peter's v1 contracts
 - What it is: DAO ije-v1.sputnik-v2.testnet, claims module ije-v1-claims.testnet,
-  escrow ije-v1-escrow.testnet; relayer stays ije-relayer.testnet. Attestor
+  escrow ije-v1-escrow.testnet, relayer ije-v1-relayer.testnet. Attestor
   public key is now ed25519:6hzVqMovzZJKF28grcG1wM8iuoLHsNdTPKDxoWDhZEH3; the
   2026-11-08 key ed25519:5nkc2Npp... is retired and nothing checks it
 - How it was done: Peter made a new attestor key and set ATTESTOR_SECRET_KEY at
