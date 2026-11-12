@@ -1,0 +1,347 @@
+{
+  "default-configuration": "Release",
+  "configurations": [
+    { "name": "Beta", "file": "Config/Beta.xcconfig" },
+    { "name": "Debug", "file": "Config/Debug.xcconfig" },
+    { "name": "Release", "file": "Config/Release.xcconfig" },
+    { "name": "Staging", "file": "Config/Staging.xcconfig" },
+  ],
+  "localizations": {
+    "development": "en",
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../packages/RunnerNear",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerAuth",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerGateway",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerSession",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerStore",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerHealthKit",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerNear",
+    },
+  ],
+  "files": [
+    {
+      "kind": "group",
+      "path": "Runner",
+      "children": [
+        {
+          "kind": "group",
+          "path": "App",
+          "children": [
+            { "path": "RunnerApp.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppEnvironment.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppConstants.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppModel.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppRouting.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppViewModelType.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AppViewModels.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "AuthStateModel.swift", "target-membership": [ "Runner/compile-sources" ] },
+            { "path": "RootView.swift", "target-membership": [ "Runner/compile-sources" ] },
+          ],
+        },
+        { "path": "Info.plist" },
+        {
+          "kind": "group",
+          "path": "Shared",
+          "children": [
+            {
+              "kind": "group",
+              "path": "Auth",
+              "children": [
+                { "path": "AppleSignInAdapter.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "AuthCallbackHandler.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "AuthFlow.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "SessionLifecycle.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "URLSessionAuthTransport.swift", "target-membership": [ "Runner/compile-sources" ] },
+              ],
+            }, {
+              "kind": "group",
+              "path": "System",
+              "children": [
+                { "path": "AuditLog.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "PermissionServices.swift", "target-membership": [ "Runner/compile-sources" ] },
+                { "path": "RunRecovery.swift", "target-membership": [ "Runner/compile-sources" ] },
+              ],
+            }, {
+              "kind": "group",
+              "path": "Store",
+              "children": [
+                { "path": "AppDatabase.swift", "target-membership": [ "Runner/compile-sources" ] },
+              ],
+            },
+          ],
+        },
+        { "path": "Runner.entitlements" },
+      ],
+    }, {
+      "kind": "group",
+      "path": "Config",
+      "children": [
+        { "path": "Debug.xcconfig" },
+        { "path": "Staging.xcconfig" },
+        { "path": "Beta.xcconfig" },
+        { "path": "Release.xcconfig" },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Runner.app", "id": "100000000000000000000008", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/RunnerTests.xctest", "id": "D0FA8E1E30A3D88800072F0C", "type": "wrapper.cfbundle", "index": false },
+      ],
+    }, {
+      "kind": "group",
+      "path": "RunnerTests",
+      "children": [
+        { "path": "AuthCallbackTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "AuthFlowTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "AuthStateModelTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "PermissionTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "RunRecoveryTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "AppDatabaseTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "SessionLifecycleTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+        { "path": "AppLinkRouteTests.swift", "target-membership": [ "RunnerTests/compile-sources" ] },
+      ],
+    }, {
+      "kind": "folder",
+      "path": "E2E",
+      "membership-exceptions": [
+        {
+          "target": "Runner",
+          "inclusions": [
+            "StagingDriver.swift",
+          ],
+        },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "Runner",
+      "id": "100000000000000000000007",
+      "product": "Products/Runner.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Beta", "file": "Config/Beta.xcconfig" },
+        { "name": "Debug", "file": "Config/Debug.xcconfig" },
+        { "name": "Release", "file": "Config/Release.xcconfig" },
+        { "name": "Staging", "file": "Config/Staging.xcconfig" },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNear",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNear",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNear",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerAuth",
+          "product-name": "RunnerAuth",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerAuth",
+          "product-name": "RunnerAuth",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerGateway",
+          "product-name": "RunnerGateway",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerGateway",
+          "product-name": "RunnerGateway",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerHealthKit",
+          "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerHealthKit",
+          "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerSession",
+          "product-name": "RunnerSession",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerSession",
+          "product-name": "RunnerSession",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerStore",
+          "product-name": "RunnerStore",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerStore",
+          "product-name": "RunnerStore",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "CLANG_ENABLE_OBJC_WEAK": "YES",
+        "DEVELOPMENT_TEAM": "QHUBYNZ482",
+        "INFOPLIST_FILE": "Runner/Info.plist",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Ije",
+        "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.sports",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije",
+        "PRODUCT_NAME": "Runner",
+        "SDKROOT": "iphoneos",
+        "SWIFT_VERSION": "6.0",
+        "TARGETED_DEVICE_FAMILY": "1",
+      },
+    }, {
+      "name": "RunnerTests",
+      "id": "2000000000000000000000160",
+      "product": "Products/RunnerTests.xctest",
+      "product-type": "bundle.unit-test",
+      "specialized-configurations": [
+        { "name": "Beta", "file": "Config/Beta.xcconfig" },
+        { "name": "Debug", "file": "Config/Debug.xcconfig" },
+        { "name": "Release", "file": "Config/Release.xcconfig" },
+        { "name": "Staging", "file": "Config/Staging.xcconfig" },
+      ],
+      "dependencies": [
+        "Runner",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNear",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNear",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "../../packages/RunnerNear",
+          "product-name": "RunnerNearTesting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerAuth",
+          "product-name": "RunnerAuth",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerAuth",
+          "product-name": "RunnerAuth",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerAuth",
+          "product-name": "RunnerAuthTesting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerGateway",
+          "product-name": "RunnerGateway",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerGateway",
+          "product-name": "RunnerGateway",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerHealthKit",
+          "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerHealthKit",
+          "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerSession",
+          "product-name": "RunnerSession",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerSession",
+          "product-name": "RunnerSession",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerSession",
+          "product-name": "RunnerSessionTesting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerStore",
+          "product-name": "RunnerStore",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerStore",
+          "product-name": "RunnerStore",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "BUNDLE_LOADER": "$(TEST_HOST)",
+        "CLANG_ENABLE_OBJC_WEAK": "YES",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_KEY_CFBundleDisplayName": "RunnerTests",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije.tests",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "SDKROOT": "iphoneos",
+        "SWIFT_VERSION": "6.0",
+        "TARGETED_DEVICE_FAMILY": "1",
+        "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/Runner.app/Runner",
+      },
+    },
+  ],
+  "build-settings": {
+    "ALWAYS_SEARCH_USER_PATHS": "NO",
+    "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING": "YES",
+    "CLANG_WARN_BOOL_CONVERSION": "YES",
+    "CLANG_WARN_COMMA": "YES",
+    "CLANG_WARN_CONSTANT_CONVERSION": "YES",
+    "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS": "YES",
+    "CLANG_WARN_EMPTY_BODY": "YES",
+    "CLANG_WARN_ENUM_CONVERSION": "YES",
+    "CLANG_WARN_INFINITE_RECURSION": "YES",
+    "CLANG_WARN_INT_CONVERSION": "YES",
+    "CLANG_WARN_NON_LITERAL_NULL_CONVERSION": "YES",
+    "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF": "YES",
+    "CLANG_WARN_OBJC_LITERAL_CONVERSION": "YES",
+    "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
+    "CLANG_WARN_RANGE_LOOP_ANALYSIS": "YES",
+    "CLANG_WARN_STRICT_PROTOTYPES": "YES",
+    "CLANG_WARN_SUSPICIOUS_MOVE": "YES",
+    "CLANG_WARN_UNREACHABLE_CODE": "YES",
+    "CLANG_WARN__DUPLICATE_METHOD_MATCH": "YES",
+    "DEAD_CODE_STRIPPING": "YES",
+    "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+    "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+    "GCC_NO_COMMON_BLOCKS": "YES",
+    "GCC_WARN_64_TO_32_BIT_CONVERSION": "YES",
+    "GCC_WARN_ABOUT_RETURN_TYPE": "YES",
+    "GCC_WARN_UNDECLARED_SELECTOR": "YES",
+    "GCC_WARN_UNINITIALIZED_AUTOS": "YES",
+    "GCC_WARN_UNUSED_FUNCTION": "YES",
+    "GCC_WARN_UNUSED_VARIABLE": "YES",
+    "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
+    "SWIFT_COMPILATION_MODE[config=Release]": "wholemodule",
+  },
+  "last-upgrade": "27.2",
+}
