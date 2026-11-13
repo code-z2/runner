@@ -115,7 +115,7 @@ struct RunLivePage: View {
               ? model?.runEncounters.map { ($0.new + $0.again).formatted() } : "3")
         }
 
-        if pacePilotEnabled { PacePilotStatusCard() }
+        if pacePilotEnabled { PacePilotStatusCard(state: model?.coach?.state ?? .idle) }
       }
       .padding(.horizontal, Theme.Spacing.screenInset)
       .padding(.vertical, Theme.Spacing.sm)
@@ -140,7 +140,7 @@ struct RunLivePage: View {
     .task {
       guard let model else { return }
       do {
-        try await model.start()
+        try await model.start(goalKilometers: goalKilometers, coaching: pacePilotEnabled)
         while !Task.isCancelled {
           await model.updateElapsed()
           try await Task.sleep(for: .seconds(1))

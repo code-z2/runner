@@ -7,6 +7,7 @@ import RunnerCadence
 import RunnerEncounters
 import RunnerHealthKit
 import RunnerLocation
+import RunnerPacePilot
 import RunnerSession
 import RunnerStore
 
@@ -40,6 +41,9 @@ final class RunLiveViewModel: AppViewModelType {
   private let canTrackEncounters: @MainActor () -> Bool
   private var encounterBaseline: EncounterCounts?
   private(set) var runEncounters: RunEncounters?
+  let coach: RunCoach?
+  private let battery = LiveBatteryProvider()
+  private var measuredSpeed: Double?
   private var session: WorkoutSession?
   private static let healthExportKey = "run.appleHealthExport"
   private let preferences: UserDefaults
@@ -64,6 +68,7 @@ final class RunLiveViewModel: AppViewModelType {
     cadence: CadenceTracker,
     healthKit: any HealthKitGateway,
     preferences: UserDefaults = .standard,
+    coach: RunCoach? = nil,
     canTrackLocation: @escaping @MainActor () -> Bool,
     encounters: EncounterTracker? = nil,
     canTrackEncounters: @escaping @MainActor () -> Bool = { true }
@@ -76,6 +81,7 @@ final class RunLiveViewModel: AppViewModelType {
     healthWorkoutAccess = healthKit.canSaveWorkouts
     self.preferences = preferences
     healthExportEnabled = preferences.bool(forKey: Self.healthExportKey)
+    self.coach = coach
     self.canTrackLocation = canTrackLocation
     self.encounters = encounters
     self.canTrackEncounters = canTrackEncounters
@@ -91,13 +97,21 @@ final class RunLiveViewModel: AppViewModelType {
     await endOrphanedActivities()
   }
 
-  func start() async throws {
+  func start(goalKilometers: Double? = nil, coaching: Bool = false) async throws {
     if session != nil { return }
     guard !isUpdating else { throw SessionError.alreadyActive }
     isUpdating = true
     defer { isUpdating = false }
-    _ = try store()
+    let runStore = try store()
     try await savePendingRun()
+    let coachingHistory: [RunRecordSnapshot]
+    if coaching, coach != nil {
+      coachingHistory =
+        (try? await runStore.recentCompletedRuns(
+          longerThan: RunCoach.minimumRunDistance, limit: RunCoach.qualifyingRunCount)) ?? []
+    } else {
+      coachingHistory = []
+    }
     try Task.checkCancellation()
     let session = WorkoutSession(store: snapshots)
     try await session.start()
@@ -106,6 +120,7 @@ final class RunLiveViewModel: AppViewModelType {
     distanceMeters = nil
     lastMeasuredCadence = nil
     state = .active
+    if coaching { coach?.begin(goalKilometers: goalKilometers, history: coachingHistory) }
     if healthExportEnabled {
       do {
         try healthKit.startWorkoutSession(at: .now)
@@ -157,6 +172,7 @@ final class RunLiveViewModel: AppViewModelType {
       defer { if state == .active { segmentStartedAt = startedAt } }
       try await session.pause(distanceMeters: distanceMeters)
       state = .paused
+      coach?.silence()
       healthKit.pauseWorkoutSession()
       await stopSensors()
     }
@@ -176,6 +192,7 @@ final class RunLiveViewModel: AppViewModelType {
     checkpointTask?.cancel()
     checkpointTask = nil
     state = .finished
+    coach?.end()
     healthKit.endWorkoutSession()
     elapsed = finished.activeElapsed
     if let activityID {
@@ -234,6 +251,15 @@ final class RunLiveViewModel: AppViewModelType {
           await refreshEncounterCounts()
         }
         guard !isUpdating, self.session === session, state == .active else { return }
+        if let coach, coach.isCoaching {
+          let distance = distanceMeters ?? 0
+          coach.ingest(
+            CoachSample(
+              elapsed: value, distance: distance, currentSpeed: measuredSpeed,
+              averageSpeed: value > 0 && distance > 0 ? distance / value : nil,
+              cadence: cadenceStepsPerMinute, heartRate: heartRate, batteryLevel: battery.level(),
+              plannedSegment: nil))
+        }
         await updateActivity(elapsed: value, onlyIfDistanceChanged: true)
       }
     } catch {
@@ -338,6 +364,7 @@ final class RunLiveViewModel: AppViewModelType {
     cadenceTask = nil
     heartRateTask = nil
     previousLocation = nil
+    measuredSpeed = nil
     pace = nil
     cadenceStepsPerMinute = nil
     heartRate = nil
@@ -376,6 +403,7 @@ final class RunLiveViewModel: AppViewModelType {
       guard sample.timestamp >= startedAt, sample.horizontalAccuracy >= 0 else { return }
       if sample.speed == 0 {
         previousLocation = nil
+        measuredSpeed = 0
         pace = nil
         return
       }
@@ -392,16 +420,19 @@ final class RunLiveViewModel: AppViewModelType {
         distanceMeters = 0
       }
       previousLocation = sample
-      pace = (sample.speed ?? measuredSpeed).flatMap { $0.isFinite && $0 > 0 ? 1_000 / $0 : nil }
+      self.measuredSpeed = sample.speed ?? measuredSpeed
+      pace = self.measuredSpeed.flatMap { $0.isFinite && $0 > 0 ? 1_000 / $0 : nil }
     case .stationary:
       previousLocation = nil
+      measuredSpeed = 0
       pace = nil
     case .accuracyReduced:
       break
     case .locationUnavailable, .authorizationDenied, .authorizationRestricted,
       .serviceSessionRequired:
       previousLocation = nil
-        pace = nil
+      measuredSpeed = nil
+      pace = nil
     }
   }
 

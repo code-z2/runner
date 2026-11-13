@@ -1,7 +1,22 @@
+import RunnerPacePilot
 import RunnerUI
 import SwiftUI
 
 struct PacePilotStatusCard: View {
+
+  var state: CoachState = .idle
+
+  private var phase: LocalizedStringKey {
+    switch state {
+    case .idle: "On"
+    case .warmUp: "Warm-up"
+    case .steady: "Steady"
+    case .accelerating: "Accelerating"
+    case .interval: "Interval"
+    case .recovery: "Recovery"
+    case .cooldown: "Cooldown"
+    }
+  }
 
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
@@ -11,6 +26,8 @@ struct PacePilotStatusCard: View {
       Text("PacePilot · On")
         .runnerText(.eyebrow)
         .foregroundStyle(Theme.Colors.highlight)
+
+      if state != .idle { Text(phase).runnerText(.caption) }
 
       PhaseAnimator(reduceMotion ? [0] : [0, 1, 2, 3]) { phase in
         HStack(spacing: Theme.Spacing.sm) {

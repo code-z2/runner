@@ -33,6 +33,9 @@
       "path": "../../packages/RunnerEncounters",
     }, {
       "kind": "local",
+      "path": "../../packages/RunnerPacePilot",
+    }, {
+      "kind": "local",
       "path": "../../packages/RunnerSession",
     }, {
       "kind": "local",
@@ -70,6 +73,9 @@
         { "path": "Assets.xcassets", "target-membership": [ "Runner/resources" ] },
         { "path": "LaunchScreen.storyboard", "target-membership": [ "Runner/resources" ] },
         { "path": "Features/Community/View/Pages/CommunityPage.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Coach/Service/CoachAudioPlayback.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Coach/Service/KokoroCueRenderer.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Coach/Service/RunCoach.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Coach/View/Pages/PacePilotOptInPage.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Coach/View/Sections/PacePilotOptInHeader.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Home/Enum/HomeTab.swift", "target-membership": [ "Runner/compile-sources" ] },
@@ -205,11 +211,13 @@
     }, {
       "kind": "folder",
       "path": "E2E",
+      "target-membership": [ "Runner" ],
       "membership-exceptions": [
         {
           "target": "Runner",
-          "inclusions": [
-            "StagingDriver.swift",
+          "exclusions": [
+            "ProofHarness.swift",
+            "RunnerKokoro",
           ],
         },
       ],
@@ -217,12 +225,14 @@
       "kind": "group",
       "path": "RunnerActivity",
       "children": [
-        { "path": "RunActivityAttributes.swift", "target-membership": [
-          "Runner/compile-sources", "RunnerActivity/compile-sources"
-        ] },
-        { "path": "RunnerActivityWidget.swift", "target-membership": [
-          "RunnerActivity/compile-sources"
-        ] },
+        {
+          "path": "RunActivityAttributes.swift",
+          "target-membership": [
+            "Runner/compile-sources",
+            "RunnerActivity/compile-sources",
+          ],
+        },
+        { "path": "RunnerActivityWidget.swift", "target-membership": [ "RunnerActivity/compile-sources" ] },
         { "path": "Info.plist" },
       ],
     },
@@ -303,6 +313,10 @@
           "product-name": "RunnerLocation",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "RunnerPacePilot",
+          "product-name": "RunnerPacePilot",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "RunnerSession",
           "product-name": "RunnerSession",
           "build-phase": { "build-phase": "frameworks" },
@@ -359,14 +373,14 @@
       "build-settings": {
         "APPLICATION_EXTENSION_API_ONLY": "YES",
         "CODE_SIGN_ENTITLEMENTS": "",
+        "CURRENT_PROJECT_VERSION": "1",
         "DEVELOPMENT_TEAM": "QHUBYNZ482",
+        "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "RunnerActivity/Info.plist",
         "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "MARKETING_VERSION": "0.1.0",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije.activity",
         "PRODUCT_NAME": "RunnerActivity",
-        "GENERATE_INFOPLIST_FILE": "YES",
-        "MARKETING_VERSION": "0.1.0",
-        "CURRENT_PROJECT_VERSION": "1",
         "SDKROOT": "iphoneos",
         "SKIP_INSTALL": "YES",
         "SWIFT_VERSION": "6.0",

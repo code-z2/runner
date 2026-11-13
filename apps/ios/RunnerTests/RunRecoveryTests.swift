@@ -22,6 +22,16 @@ import Testing
 
 struct RunRecoveryTests {
 
+  @Test(arguments: ["iPhone14,7", "iPhone14,8", "iPhone15,2", "iPhone15,3", "iPhone17,1"])
+  func kokoroSupportsIPhone14AndNewer(_ identifier: String) {
+    #expect(KokoroCueRenderer.supportsKokoro(deviceIdentifier: identifier))
+  }
+
+  @Test(arguments: ["iPhone13,2", "iPhone14,5", "iPhone14,6", "iPad16,3", "arm64", "iPhone15,,2"])
+  func olderAndUnsupportedDevicesUseSystemSpeech(_ identifier: String) {
+    #expect(!KokoroCueRenderer.supportsKokoro(deviceIdentifier: identifier))
+  }
+
   @Test
   func paceUsesMinutesAndSecondsEvenAboveOneHour() {
     #expect(RunHistoryMetrics.paceTime(303.25) == "5:03")

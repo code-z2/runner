@@ -64,6 +64,7 @@ fastlane/test_output
 
 .claude
 .agents
+.models
 .DS_Store
 node_modules/
 .wrangler/

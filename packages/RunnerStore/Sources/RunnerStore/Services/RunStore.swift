@@ -70,6 +70,20 @@ public actor RunStore {
     return models.map(RunRecordSnapshot.init(model:))
   }
 
+  public func recentCompletedRuns(
+    longerThan minimumDistance: Double, limit: Int
+  ) throws -> [RunRecordSnapshot] {
+    guard limit > 0 else { return [] }
+    let reason = String(describing: FinishReason.userFinished)
+    var descriptor = FetchDescriptor<RunRecordModel>(
+      predicate: #Predicate {
+        $0.finishReasonRaw == reason && ($0.distanceMeters ?? 0) > minimumDistance
+      },
+      sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
+    descriptor.fetchLimit = limit
+    return try modelContext.fetch(descriptor).map(RunRecordSnapshot.init(model:))
+  }
+
   public func personalBests() throws -> PersonalBestsSnapshot {
     let descriptor = FetchDescriptor<RunRecordModel>()
     let models: [RunRecordModel]

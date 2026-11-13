@@ -35,6 +35,7 @@ final class AppViewModels {
   lazy var live = RunLiveViewModel(
     snapshots: app.snapshots, store: { [app] in try app.runStore.get() },
     location: app.runLocation, cadence: app.runCadence, healthKit: app.healthKit,
+    coach: RunCoach(),
     canTrackLocation: { [app] in
       let status = app.permissions.location.status
       return status == .whenInUse || status == .always

@@ -4,6 +4,7 @@ import SwiftUI
 struct RunCountdownPage: View {
 
   let pacePilotEnabled: Bool
+  var coach: RunCoach?
   var onCompletion: (() -> Void)?
 
   @State
@@ -41,13 +42,14 @@ struct RunCountdownPage: View {
     .environment(\.colorScheme, .dark)
     .toolbarVisibility(.hidden, for: .navigationBar)
     .task {
+      // Loading starts here so the ~9s cold start overlaps the visual
+      // countdown; the run itself never waits for the voice.
+      if pacePilotEnabled { coach?.startPreload() }
       guard let onCompletion else { return }
       do {
-        while count > 1 {
-          try await Task.sleep(for: .seconds(1))
-          count -= 1
+        try await RunCoach.playCountdown {
+          count = $0
         }
-        try await Task.sleep(for: .seconds(1))
         onCompletion()
       } catch {
         return

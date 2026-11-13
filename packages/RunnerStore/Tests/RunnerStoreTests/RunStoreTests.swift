@@ -34,6 +34,26 @@ struct RunStoreTests {
   }
 
   @Test
+  func coachingHistoryCountsOnlyCompletedRunsStrictlyOverMinimumDistance() async throws {
+    let store = try TestStoreFactory.makeStore()
+    for index in 0..<11 {
+      let (run, distance) = finishedRun(
+        startedAt: Date(timeIntervalSince1970: Double(index)), distanceMeters: 2_501)
+      _ = try await store.record(run, distanceMeters: distance)
+    }
+    let (atMinimum, _) = finishedRun()
+    _ = try await store.record(atMinimum, distanceMeters: 2_500)
+    let interrupted = FinishedRunModel(
+      id: UUID(), startedAtWall: .now, activeElapsed: 60, finishedAtWall: .now,
+      finishReason: .crashCut, batteryLevelAtStart: nil, batteryLevelAtEnd: nil)
+    _ = try await store.record(interrupted, distanceMeters: 3_000)
+    let eligible = try await store.recentCompletedRuns(longerThan: 2_500, limit: 10)
+    #expect(eligible.count == 10)
+    #expect(eligible.allSatisfy { $0.distanceMeters == 2_501 })
+    #expect(eligible.last?.startedAt == Date(timeIntervalSince1970: 1))
+  }
+
+  @Test
   func versionOneHistoryMigratesAndNewRunsKeepCadence() async throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

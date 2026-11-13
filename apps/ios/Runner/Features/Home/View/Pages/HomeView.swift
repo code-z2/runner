@@ -42,7 +42,7 @@ struct HomeView: View {
             case .community:
               CommunityPage()
             case .countdown(let distanceKilometers):
-              RunCountdownPage(pacePilotEnabled: pacePilotEnabled) {
+              RunCountdownPage(pacePilotEnabled: pacePilotEnabled, coach: live?.coach) {
                 guard navigation.path.last == destination else { return }
                 navigation.path[navigation.path.count - 1] = .live(
                   distanceKilometers: distanceKilometers)
