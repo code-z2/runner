@@ -27,7 +27,7 @@
       HomeView(
         run: RunViewModel(runs: runs),
         weatherModel: WeatherModel(weather: weather, fetch: { nil }),
-        date: date, onStart: { _ in },
+        date: date,
         navigation: navigation
       )
       .environment(\.dynamicTypeSize, fixture == .worstCase ? .accessibility3 : .large)

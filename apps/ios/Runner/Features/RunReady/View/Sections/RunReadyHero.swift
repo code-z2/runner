@@ -13,7 +13,7 @@ struct RunReadyHero: View {
   @Environment(\.dynamicTypeSize)
   private var dynamicType
 
-  private let startTopInset: CGFloat = 226
+  private let startTopInset: CGFloat = 218
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {

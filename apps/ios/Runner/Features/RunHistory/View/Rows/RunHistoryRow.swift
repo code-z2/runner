@@ -36,8 +36,8 @@ struct RunHistoryRow: View {
         spacing: Theme.Spacing.hair
       ) {
         Text(RunHistoryMetrics.time(run.elapsed) ?? "—").runnerText(.bodyMedium)
-        if let kilometers, let pace = RunHistoryMetrics.time(run.elapsed / kilometers) {
-          Text("\(pace) /km")
+        if let kilometers, let pace = RunHistoryMetrics.paceMinutes(run.elapsed / kilometers) {
+          Text("\(pace) min/km")
             .runnerText(.caption)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
         }

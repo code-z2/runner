@@ -14,6 +14,17 @@ struct RunSummaryPage: View {
   var claimPass: ClaimPass?
   var communityBalanceLow = false
   var openClaim: (() -> Void)?
+  var healthConnection: RunLiveViewModel?
+  var showsLatestHealthExport = false
+
+  @State
+  private var exporting = false
+
+  @Environment(\.scenePhase)
+  private var scenePhase
+
+  @State
+  private var exportFailed = false
 
   @Environment(\.dynamicTypeSize)
   private var dynamicType
@@ -67,7 +78,10 @@ struct RunSummaryPage: View {
           RunMetric(label: "Time", value: time(elapsed))
           RunMetric(
             label: "Avg pace",
-            value: distanceKilometers.flatMap { $0 > 0 ? time(elapsed / $0) : nil }, unit: "/km")
+            value: distanceKilometers.flatMap {
+              $0 > 0 ? RunHistoryMetrics.paceMinutes(elapsed / $0) : nil
+            },
+            unit: "min/km")
           RunMetric(label: "Cadence", value: cadence?.formatted(), unit: "spm")
         }
 
@@ -75,9 +89,9 @@ struct RunSummaryPage: View {
           Text("Runners crossed").runnerText(.eyebrow)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
           layout {
-            RunMetric(label: "New", value: encounters?.new.formatted())
-            RunMetric(label: "Again", value: encounters?.again.formatted())
-            RunMetric(label: "Ran together", value: encounters?.together.formatted())
+            RunMetric(label: "New", value: (encounters?.new ?? 0).formatted())
+            RunMetric(label: "Again", value: (encounters?.again ?? 0).formatted())
+            RunMetric(label: "Ran together", value: (encounters?.together ?? 0).formatted())
           }
         }
         .padding(Theme.Spacing.md)
@@ -106,6 +120,8 @@ struct RunSummaryPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
 
+        if let healthConnection { healthSection(healthConnection) }
+
         if let claimPass {
           ClaimPassBanner(
             pass: claimPass, communityBalanceLow: communityBalanceLow, action: openClaim)
@@ -119,6 +135,67 @@ struct RunSummaryPage: View {
     .navigationTitle("Run summary")
     .navigationBarTitleDisplayMode(.inline)
     .tint(Theme.Colors.foreground)
+    .task(id: scenePhase) {
+      if scenePhase == .active { healthConnection?.refreshHealthAccess() }
+    }
+    .alert("Apple Health access unavailable", isPresented: $exportFailed) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(
+        "Allow Runner to write Workouts in Apple Health. Walking + Running Distance is optional.")
+    }
+  }
+
+  private func healthSection(_ model: RunLiveViewModel) -> some View {
+    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+      HStack(spacing: Theme.Spacing.sm) {
+        Image(.appleHealthIcon)
+          .resizable()
+          .scaledToFit()
+          .frame(width: Theme.Sizing.iconMd, height: Theme.Sizing.iconMd)
+          .accessibilityHidden(true)
+        Text("Apple Health").runnerText(.bodyMedium)
+      }
+      if model.isHealthConnected {
+        Text("Connected • Runs are saved automatically")
+      } else {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: Theme.Spacing.xs) {
+            Text("Disconnected •").fixedSize()
+            connectHealthButton(model).fixedSize()
+          }
+          VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text("Disconnected")
+            connectHealthButton(model)
+          }
+        }
+      }
+      if showsLatestHealthExport, model.healthExportFailed {
+        Text("The latest run stayed in Runner. Apple Health couldn’t save it.")
+      }
+    }
+    .runnerText(.caption)
+  }
+
+  private func connectHealthButton(_ model: RunLiveViewModel) -> some View {
+    Button {
+      exporting = true
+      Task {
+        defer { exporting = false }
+        do {
+          try await model.enableHealthExport()
+        } catch {
+          exportFailed = true
+        }
+      }
+    } label: {
+      Text("Click to connect")
+        .underline()
+        .foregroundStyle(Theme.Colors.actionText)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Connect Apple Health")
+    .disabled(exporting)
   }
 
   private var daypart: String {
@@ -144,7 +221,8 @@ struct RunSummaryPage: View {
   #Preview("Summary · Pass ready") {
     NavigationStack {
       RunSummaryPage(
-        elapsed: 1541, distanceKilometers: 5.12, cadence: 171, encounters: RunEncounters(new: 3, again: 1, together: 1),
+        elapsed: 1541, distanceKilometers: 5.12, cadence: 171,
+        encounters: RunEncounters(new: 3, again: 1, together: 1),
         splits: [304, 300, 298, 302, 305], achievement: "Fastest 5K this month",
         claimPass: .init(
           version: 1, accountID: "", activityHash: "", maxAmountCents: 256,
@@ -156,7 +234,8 @@ struct RunSummaryPage: View {
   #Preview("Summary · Community balance low") {
     NavigationStack {
       RunSummaryPage(
-        elapsed: 1541, distanceKilometers: 5.12, cadence: 171, encounters: RunEncounters(new: 3, again: 1, together: 1),
+        elapsed: 1541, distanceKilometers: 5.12, cadence: 171,
+        encounters: RunEncounters(new: 3, again: 1, together: 1),
         splits: [304, 300, 298, 302, 305], achievement: "Fastest 5K this month",
         claimPass: .init(
           version: 1, accountID: "", activityHash: "", maxAmountCents: 256,

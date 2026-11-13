@@ -28,7 +28,7 @@ struct RunReadyView: View {
 
   var body: some View {
     ScrollView {
-      VStack(spacing: Theme.Spacing.lg) {
+      VStack(spacing: Theme.Spacing.md) {
         RunReadyHero(
           weather: weather, date: date, usesNativeHeader: usesNativeHeader,
           distance: distance, onStart: onStart, showCommunity: { open(.community) })
@@ -39,7 +39,6 @@ struct RunReadyView: View {
           })
         if let lastRun = viewModel.runs.first {
           LastRunCard(run: lastRun, showHistory: { open(.history) })
-            .padding(.top, Theme.Spacing.md)
         } else {
           Text(viewModel.historyUnavailable ? "Run history is unavailable" : "No activity yet")
             .runnerText(.titleSmall)
@@ -47,7 +46,7 @@ struct RunReadyView: View {
             .frame(minHeight: Theme.Spacing.screenTop)
         }
       }
-      .padding(.bottom, Theme.Spacing.sm)
+      .padding(.bottom, Theme.Spacing.lg)
     }
     .background(alignment: .top) {
       RunHeroBackdrop().ignoresSafeArea(.container, edges: .top)

@@ -13,13 +13,13 @@ struct ReadyRunMetrics: View {
     }
     let distance = kilometers?.formatted(.number.precision(.fractionLength(2)).locale(locale))
     let time = formattedTime(run.elapsed)
-    let pace = kilometers.flatMap { formattedTime(run.elapsed / $0) }
+    let pace = kilometers.flatMap { RunHistoryMetrics.paceMinutes(run.elapsed / $0) }
 
     if vertical {
       VStack(alignment: .leading, spacing: Theme.Spacing.md) {
         RunMetric(label: "Distance", value: distance, unit: "km")
         RunMetric(label: "Time", value: time)
-        RunMetric(label: "Avg pace", value: pace, unit: "/km")
+        RunMetric(label: "Avg pace", value: pace, unit: "min/km")
       }
     } else {
       ViewThatFits(in: .horizontal) {
@@ -29,14 +29,14 @@ struct ReadyRunMetrics: View {
           ).frame(maxWidth: .infinity, alignment: .leading)
           RunMetric(label: "Time", value: time).fixedSize(horizontal: true, vertical: false).frame(
             maxWidth: .infinity, alignment: .leading)
-          RunMetric(label: "Avg pace", value: pace, unit: "/km").fixedSize(
+          RunMetric(label: "Avg pace", value: pace, unit: "min/km").fixedSize(
             horizontal: true, vertical: false
           ).frame(maxWidth: .infinity, alignment: .leading)
         }
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
           RunMetric(label: "Distance", value: distance, unit: "km")
           RunMetric(label: "Time", value: time)
-          RunMetric(label: "Avg pace", value: pace, unit: "/km")
+          RunMetric(label: "Avg pace", value: pace, unit: "min/km")
         }
       }
     }

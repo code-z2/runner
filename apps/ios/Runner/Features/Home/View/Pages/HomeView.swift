@@ -3,9 +3,9 @@ import SwiftUI
 struct HomeView: View {
 
   let run: RunViewModel
+  var live: RunLiveViewModel?
   let weatherModel: WeatherModel
   var date: Date = .now
-  var onStart: ((Double?) -> Void)?
   @AppStorage("pacePilot.enabled")
   private var pacePilotEnabled = false
 
@@ -26,7 +26,12 @@ struct HomeView: View {
   var body: some View {
     TabView(selection: $selection) {
       Tab("Run", systemImage: "waveform.path", value: HomeTab.run) {
-        NavigationStack(path: $navigation.path) {
+        NavigationStack(
+          path: Binding(
+            get: { navigation.path },
+            set: navigation.updatePathFromNavigationStack
+          )
+        ) {
           RunReadyView(
             viewModel: run, weather: weatherModel.weather, date: date,
             onStart: { navigation.open(.countdown(distanceKilometers: $0)) },
@@ -41,21 +46,26 @@ struct HomeView: View {
                 guard navigation.path.last == destination else { return }
                 navigation.path[navigation.path.count - 1] = .live(
                   distanceKilometers: distanceKilometers)
-                onStart?(distanceKilometers)
               }
             case .live(let distanceKilometers):
               RunLivePage(
                 goalKilometers: distanceKilometers, pacePilotEnabled: pacePilotEnabled,
-                finish: { elapsed in
+                model: live,
+                onStartFailure: {
                   guard navigation.path.last == destination else { return }
-                  navigation.path[navigation.path.count - 1] = .summary(elapsed: elapsed)
+                  navigation.path.removeLast()
+                },
+                onFinish: { savedRun in
+                  guard navigation.path.last == destination else { return }
+                  navigation.path[navigation.path.count - 1] = .summary(savedRun)
+                  await run.refreshHistory()
                 })
-            case .summary(let elapsed):
-              RunSummaryPage(elapsed: elapsed)
-            case .savedSummary(let savedRun):
+            case .summary(let savedRun), .savedSummary(let savedRun):
               RunSummaryPage(
                 elapsed: savedRun.elapsed, date: savedRun.date,
-                distanceKilometers: RunHistoryMetrics.kilometers(savedRun.distanceMeters))
+                distanceKilometers: RunHistoryMetrics.kilometers(savedRun.distanceMeters),
+                cadence: savedRun.cadenceStepsPerMinute,
+                healthConnection: live, showsLatestHealthExport: destination == .summary(savedRun))
             case .history:
               RunHistoryPage(runs: run.runs, unavailable: run.historyUnavailable)
             }

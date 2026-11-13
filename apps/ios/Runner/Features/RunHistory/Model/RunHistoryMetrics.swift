@@ -24,6 +24,19 @@ struct RunHistoryMetrics {
     return meters / 1_000
   }
 
+  static func paceTime(_ secondsPerKilometer: TimeInterval) -> String? {
+    guard secondsPerKilometer.isFinite, secondsPerKilometer > 0,
+      secondsPerKilometer <= 120 * 60
+    else { return nil }
+    return Duration.seconds(secondsPerKilometer.rounded()).formatted(.time(pattern: .minuteSecond))
+  }
+
+  static func paceMinutes(_ secondsPerKilometer: TimeInterval) -> String? {
+    guard secondsPerKilometer.isFinite, secondsPerKilometer > 0 else { return nil }
+    if secondsPerKilometer > 120 * 60 { return "120+" }
+    return (secondsPerKilometer / 60).rounded(.down).formatted(.number)
+  }
+
   static func time(_ seconds: TimeInterval) -> String? {
     guard seconds.isFinite, seconds >= 0, seconds < Double(Int64.max) else { return nil }
     let rounded = seconds.rounded()
