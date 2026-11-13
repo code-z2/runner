@@ -73,7 +73,12 @@ public actor RunStore {
     } catch {
       throw StoreError.fetchFailed
     }
-    let longest = models.max(by: { $0.activeElapsed < $1.activeElapsed })
+    let longest = models.max(by: { a, b in
+      if (a.distanceMeters ?? 0) != (b.distanceMeters ?? 0) {
+        return (a.distanceMeters ?? 0) < (b.distanceMeters ?? 0)
+      }
+      return a.activeElapsed < b.activeElapsed
+    })
     let paced = models.compactMap { model -> Double? in
       guard let distance = model.distanceMeters, distance >= 1_000, distance > 0 else {
         return nil
