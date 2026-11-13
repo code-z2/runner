@@ -15,7 +15,6 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
 
   public private(set) var state: CoachState = .idle
 
-  private var opened = false
   private var lastKilometer = 0
   private var previousRemaining: Double?
   private var emittedEndgame: Set<Int> = []
@@ -61,25 +60,22 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
   /// Inside the final 400 m the run reads as cooldown.
   private static let cooldownInside = 400.0
 
-  public init() {}
+  private let adaptiveEnabled: Bool
 
-  public mutating func openingCues() -> [CoachCue] {
-    guard !opened else { return [] }
-    opened = true
-    return ["3", "2", "1"].map { CoachCue(kind: .countdown, text: $0, priority: .urgent) }
+  public init(adaptiveEnabled: Bool = true) {
+    self.adaptiveEnabled = adaptiveEnabled
   }
 
   public mutating func advise(sample: CoachSample, context: CoachContext) -> CoachCue? {
     updateState(sample: sample, context: context)
     trackSpeed(sample.currentSpeed)
 
-    // Priority order: countdown is handled by openingCues; here
-    // battery > completion/endgame > stopped > kilometer > adaptive.
+    // Priority: battery > completion/endgame > stopped > kilometer > adaptive.
     if let cue = batteryCue(sample: sample) { return cue }
     if let cue = goalCue(sample: sample, context: context) { return cue }
     if let cue = stoppedCue(sample: sample) { return cue }
     if let cue = kilometerCue(sample: sample) { return cue }
-    return adaptiveCue(sample: sample, context: context)
+    return adaptiveEnabled ? adaptiveCue(sample: sample, context: context) : nil
   }
 
   // MARK: - State
@@ -128,7 +124,7 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
     let percent = Int((level * 100).rounded())
     return CoachCue(
       kind: .batteryNudge,
-      text: "Battery is low at \(percent) percent.",
+      text: "Battery is low at \(SpelledOutNumber.words(percent)) percent.",
       priority: .urgent
     )
   }
@@ -147,7 +143,7 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
         emittedEndgame.insert(mark)
         return CoachCue(
           kind: .endgame,
-          text: "\(mark) meters to go.",
+          text: "\(SpelledOutNumber.capitalizedWords(mark)) meters to go.",
           priority: .urgent
         )
       }
@@ -185,9 +181,10 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
     let kilometer = Int(sample.distance / 1000)
     guard kilometer > lastKilometer else { return nil }
     lastKilometer = kilometer
-    var text = "Kilometer \(kilometer)."
-    let pace = Self.paceString(speedMetersPerSecond: sample.averageSpeed)
-    if pace != "unknown pace" { text += " \(pace)." }
+    var text = "Kilometer \(SpelledOutNumber.words(kilometer))."
+    if let pace = Self.spokenPaceString(speedMetersPerSecond: sample.averageSpeed) {
+      text += " \(pace)."
+    }
     return CoachCue(kind: .kilometer, text: text, priority: .routine)
   }
 
@@ -266,7 +263,18 @@ public struct RulesCoachBrain: CoachBrain, Sendable {
 
   static func paceString(speedMetersPerSecond: Double?) -> String {
     guard let speed = speedMetersPerSecond, speed > 0 else { return "unknown pace" }
-    let secondsPerKm = Int((1000 / speed).rounded())
+    guard let secondsPerKm = Int(exactly: (1_000 / speed).rounded()), secondsPerKm <= 7_200
+    else { return "unknown pace" }
     return "\(secondsPerKm / 60):\(String(format: "%02d", secondsPerKm % 60))/km"
+  }
+
+  /// Spoken form of `paceString` for TTS cues, e.g. "Your average pace is
+  /// six minutes and twenty seconds per kilometer". Nil when unknown.
+  static func spokenPaceString(speedMetersPerSecond: Double?) -> String? {
+    guard let speed = speedMetersPerSecond, speed > 0,
+      let total = Int(exactly: (1_000 / speed).rounded()), total <= 7_200
+    else { return nil }
+    return "Your average pace is "
+      + "\(SpelledOutNumber.pace(minutes: total / 60, seconds: total % 60)) per kilometer"
   }
 }

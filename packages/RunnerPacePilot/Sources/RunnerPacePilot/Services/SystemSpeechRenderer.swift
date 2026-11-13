@@ -8,33 +8,79 @@
 import AVFoundation
 import Foundation
 
-/// v1 voice backend: Apple speech synthesis, premium-first selection,
-/// spoken through the app session so the ducking policy applies.
-/// Personal Voice appears here automatically once the runner creates one
-/// and opts in via `preferredVoiceID`. Compile-verified; voice behavior
-/// is proven on-device (simulators lack downloadable premium voices).
-public final class SystemSpeechRenderer: CueRenderer, @unchecked Sendable {
+/// Apple speech backend. A render completes when playback ends.
+@MainActor
+public final class SystemSpeechRenderer: NSObject, CueRenderer, AVSpeechSynthesizerDelegate {
 
-  // AVSpeechSynthesizer is main-thread bound; every use hops to MainActor,
-  // which is what makes the unchecked conformance sound.
   private let synthesizer = AVSpeechSynthesizer()
+  private var playback: CheckedContinuation<Void, Never>?
+  private var utteranceID: ObjectIdentifier?
   private let locale: Locale
   private let preferredVoiceID: String?
 
   public init(locale: Locale = .current, preferredVoiceID: String? = nil) {
     self.locale = locale
     self.preferredVoiceID = preferredVoiceID
+    super.init()
+    synthesizer.delegate = self
+    #if os(iOS)
+      synthesizer.usesApplicationAudioSession = false
+    #endif
   }
 
   public func render(_ cue: CoachCue) async {
-    // Speech follows the app's audio session: the app layer applies
-    // AudioSessionPolicy.voicePrompt around each cue so music ducks.
+    guard !Task.isCancelled, playback == nil else { return }
     let utterance = AVSpeechUtterance(string: cue.text)
     utterance.voice = platformVoice()
-    let synthesizer = self.synthesizer
-    await MainActor.run {
-      synthesizer.speak(utterance)
+    let id = ObjectIdentifier(utterance)
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        guard !Task.isCancelled else {
+          continuation.resume()
+          return
+        }
+        playback = continuation
+        utteranceID = id
+        synthesizer.speak(utterance)
+      }
+    } onCancel: {
+      Task { @MainActor in
+        guard self.utteranceID == id else { return }
+        self.stop()
+      }
     }
+  }
+
+  public func stop() {
+    synthesizer.stopSpeaking(at: .immediate)
+    completePlayback()
+  }
+
+  public nonisolated func speechSynthesizer(
+    _ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance
+  ) {
+    finish(utterance)
+  }
+
+  public nonisolated func speechSynthesizer(
+    _ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance
+  ) {
+    finish(utterance)
+  }
+
+  private nonisolated func finish(_ utterance: AVSpeechUtterance) {
+    let id = ObjectIdentifier(utterance)
+    Task { @MainActor in
+      guard self.utteranceID == id else { return }
+      self.completePlayback()
+    }
+  }
+
+  private func completePlayback() {
+    utteranceID = nil
+    let continuation = playback
+    playback = nil
+    continuation?.resume()
   }
 
   public func setBeatInterval(_ interval: TimeInterval?) async {
@@ -44,7 +90,12 @@ public final class SystemSpeechRenderer: CueRenderer, @unchecked Sendable {
   }
 
   private func platformVoice() -> AVSpeechSynthesisVoice? {
-    let infos = AVSpeechSynthesisVoice.speechVoices().map {
+    // Coaching cues are written in English.
+    let voices = AVSpeechSynthesisVoice.speechVoices().filter {
+      ($0.language == "en" || $0.language.hasPrefix("en-"))
+        && $0.voiceTraits.intersection([.isNoveltyVoice, .isPersonalVoice]).isEmpty
+    }
+    let infos = voices.map {
       SpeechVoiceInfo(
         id: $0.identifier,
         name: $0.name,
@@ -59,8 +110,8 @@ public final class SystemSpeechRenderer: CueRenderer, @unchecked Sendable {
         preferredVoiceID: preferredVoiceID
       )
     else {
-      return nil
+      return AVSpeechSynthesisVoice(language: "en-US")
     }
-    return AVSpeechSynthesisVoice(identifier: pick.id)
+    return voices.first { $0.identifier == pick.id }
   }
 }

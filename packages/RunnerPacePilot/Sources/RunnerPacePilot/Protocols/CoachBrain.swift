@@ -15,7 +15,4 @@ public protocol CoachBrain: Sendable {
   /// One sample in, at most one cue out. `nil` is the common case —
   /// the coach stays quiet unless something is worth saying.
   mutating func advise(sample: CoachSample, context: CoachContext) -> CoachCue?
-
-  /// 3-2-1 countdown at run start. Emitted once per brain lifetime.
-  mutating func openingCues() -> [CoachCue]
 }

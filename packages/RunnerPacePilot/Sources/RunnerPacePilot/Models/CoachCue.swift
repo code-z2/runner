@@ -25,7 +25,6 @@ public struct CoachCue: Sendable, Equatable {
 
 public enum CueKind: String, Sendable, Equatable, Codable {
 
-  case countdown
   case kilometer
   case endgame
   case complete
@@ -41,6 +40,6 @@ public enum CuePriority: Sendable, Equatable {
   /// Spaced by the scheduler's quiet policy.
   case routine
 
-  /// Bypasses spacing: countdown, endgame, completion, battery.
+  /// Bypasses spacing: endgame, completion, battery.
   case urgent
 }

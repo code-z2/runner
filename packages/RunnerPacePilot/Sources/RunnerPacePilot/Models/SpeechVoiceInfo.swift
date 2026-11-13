@@ -6,9 +6,7 @@
 //
 
 /// A renderer-agnostic voice descriptor. The selector ranks these with
-/// pure logic; adapters map platform voices (Apple speech, Kokoro pack)
-/// into this shape. Nothing here touches AVFoundation, so selection is
-/// unit-testable and backend-swappable.
+/// pure logic so selection can be tested independently of AVFoundation.
 public struct SpeechVoiceInfo: Sendable, Equatable {
 
   public let id: String

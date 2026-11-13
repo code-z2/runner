@@ -9,7 +9,7 @@ import Foundation
 
 /// Quiet-by-default gate between brain and renderer. Routine cues are
 /// spaced (the coach stays quiet most of the time); urgent cues —
-/// countdown, endgame, completion, battery — bypass spacing. Anything
+/// endgame, completion, battery — bypass spacing. Anything
 /// the preferences forbid is dropped and counted, never rendered.
 public actor CueScheduler {
 
@@ -24,6 +24,7 @@ public actor CueScheduler {
 
   private var lastRoutineRenderedAt: Date?
   public private(set) var droppedCount = 0
+  public var state: CoachState { brain.state }
 
   public init(
     brain: any CoachBrain,
@@ -37,16 +38,6 @@ public actor CueScheduler {
     self.preferences = preferences
     self.beatTarget = beatTarget
     self.clock = clock
-  }
-
-  /// Run start: speaks the 3-2-1 once. Silent when the coach is off.
-  public func start(context: CoachContext) async {
-    guard preferences.masterEnabled else { return }
-    _ = context
-    for cue in brain.openingCues() {
-      await renderer.render(cue)
-    }
-    lastRoutineRenderedAt = clock()
   }
 
   /// One measured sample in. At most one cue out, plus a beat update.

@@ -36,6 +36,30 @@ struct SpeechVoiceSelectorTests {
   }
 
   @Test
+  func prefersPremiumOverLocalEnhancedVoice() {
+    let voices = [
+      voice(id: "local", quality: .enhanced),
+      voice(id: "premium", language: "en-GB", quality: .premium),
+    ]
+    #expect(
+      SpeechVoiceSelector.pick(
+        from: voices, locale: Locale(identifier: "en-US"), preferredVoiceID: nil
+      )?.id == "premium")
+  }
+
+  @Test
+  func prefersLocalVoiceAtTheSameQuality() {
+    let voices = [
+      voice(id: "other", language: "en-GB", quality: .premium),
+      voice(id: "local", quality: .premium),
+    ]
+    #expect(
+      SpeechVoiceSelector.pick(
+        from: voices, locale: Locale(identifier: "en-US"), preferredVoiceID: nil
+      )?.id == "local")
+  }
+
+  @Test
   func preferredVoiceIDWins() {
     let voices = [
       voice(id: "premium", quality: .premium),

@@ -44,7 +44,7 @@ public struct AudioSessionPolicy: Sendable, Equatable {
       try session.setCategory(
         .playback,
         mode: .voicePrompt,
-        options: [.duckOthers, .notifyOthersOnDeactivation]
+        options: [.duckOthers]
       )
       try session.setActive(true)
     }

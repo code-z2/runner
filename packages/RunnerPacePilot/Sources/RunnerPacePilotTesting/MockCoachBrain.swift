@@ -26,8 +26,4 @@ public struct MockCoachBrain: CoachBrain, Sendable {
     guard index < queued.count else { return nil }
     return queued[index]
   }
-
-  public mutating func openingCues() -> [CoachCue] {
-    ["3", "2", "1"].map { CoachCue(kind: .countdown, text: $0, priority: .urgent) }
-  }
 }

@@ -40,26 +40,47 @@ struct RulesCoachBrainTests {
   }
 
   @Test
-  func openingCuesCountDownOnce() {
-    var brain = RulesCoachBrain()
-    let first = brain.openingCues()
-    #expect(first.map(\.text) == ["3", "2", "1"])
-    #expect(first.allSatisfy { $0.priority == .urgent })
-    #expect(brain.openingCues().isEmpty)
-  }
-
-  @Test
   func steadyMilesProduceKilometerMarks() {
     var brain = RulesCoachBrain()
     let first = brain.advise(sample: sample(distance: 1001), context: context())
     #expect(first?.kind == .kilometer)
-    #expect(first?.text.contains("Kilometer 1") == true)
+    #expect(first?.text.contains("Kilometer one") == true)
     // Same kilometer again stays quiet.
     let secondCue = brain.advise(sample: sample(distance: 1501), context: context())
     #expect(secondCue == nil)
     let second = brain.advise(sample: sample(distance: 2001), context: context())
     #expect(second?.kind == .kilometer)
-    #expect(second?.text.contains("Kilometer 2") == true)
+    #expect(second?.text.contains("Kilometer two") == true)
+  }
+
+  @Test
+  func kilometerCueSpellsOutNumberAndPace() {
+    var brain = RulesCoachBrain()
+    let cue = brain.advise(
+      sample: sample(distance: 1001, averageSpeed: 1000 / 380),
+      context: context()
+    )
+    #expect(
+      cue?.text
+        == "Kilometer one. Your average pace is six minutes and twenty seconds per kilometer."
+    )
+  }
+
+  @Test
+  func spokenPaceHandlesSingularsAndUnknown() {
+    #expect(
+      RulesCoachBrain.spokenPaceString(speedMetersPerSecond: 1000 / 61)
+        == "Your average pace is one minute and one second per kilometer")
+    #expect(RulesCoachBrain.spokenPaceString(speedMetersPerSecond: nil) == nil)
+    #expect(RulesCoachBrain.spokenPaceString(speedMetersPerSecond: 0) == nil)
+  }
+
+  @Test
+  func spelledOutNumbersArePlainWords() {
+    #expect(SpelledOutNumber.words(42) == "forty two")
+    #expect(SpelledOutNumber.words(1) == "one")
+    #expect(SpelledOutNumber.capitalizedWords(400) == "Four hundred")
+    #expect(SpelledOutNumber.pace(minutes: 5, seconds: 33) == "five minutes and thirty three seconds")
   }
 
   @Test
@@ -150,7 +171,7 @@ struct RulesCoachBrainTests {
     _ = brain.advise(sample: sample(distance: 4400), context: ctx)
     let cue = brain.advise(sample: sample(distance: 4600), context: ctx)
     #expect(cue?.kind == .endgame)
-    #expect(cue?.text.contains("400") == true)
+    #expect(cue?.text.contains("Four hundred") == true)
     #expect(cue?.priority == .urgent)
   }
 

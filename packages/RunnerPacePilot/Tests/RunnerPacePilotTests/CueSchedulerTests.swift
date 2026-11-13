@@ -55,15 +55,6 @@ struct CueSchedulerTests {
   }
 
   @Test
-  func startRendersOpeningCues() async {
-    let box = ClockBox()
-    let (scheduler, renderer) = scheduler(box: box)
-    await scheduler.start(context: context())
-    let rendered = await renderer.rendered
-    #expect(rendered.map(\.text) == ["3", "2", "1"])
-  }
-
-  @Test
   func quietByDefault() async {
     let box = ClockBox()
     let brain = MockCoachBrain(queued: [nil])

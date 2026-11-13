@@ -7,10 +7,7 @@
 
 import Foundation
 
-/// Pure voice ranking. Explicit user choice wins; otherwise the best
-/// quality voice in the runner's locale, falling back to the best
-/// quality anywhere. v1 feeds this from Apple speech (premium-first);
-/// the Kokoro voice pack feeds the same ranking later.
+/// Explicit voice choice wins, followed by quality and then locale.
 public enum SpeechVoiceSelector {
 
   public static func pick(
@@ -23,9 +20,11 @@ public enum SpeechVoiceSelector {
     {
       return match
     }
-    let languagePrefix = String(locale.identifier.prefix(2)).lowercased()
-    let local = voices.filter { $0.language.lowercased().hasPrefix(languagePrefix) }
-    if let best = local.max(by: { $0.quality < $1.quality }) { return best }
-    return voices.max(by: { $0.quality < $1.quality })
+    let preferredLanguage = locale.identifier.replacingOccurrences(of: "_", with: "-")
+    return voices.max {
+      if $0.quality != $1.quality { return $0.quality < $1.quality }
+      return $0.language.caseInsensitiveCompare(preferredLanguage) != .orderedSame
+        && $1.language.caseInsensitiveCompare(preferredLanguage) == .orderedSame
+    }
   }
 }
