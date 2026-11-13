@@ -20,6 +20,18 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Runner detects nearby runners for proximity encounters.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Runner reads workouts and heart rate to coach you mid-run.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Runner saves your finished runs to Health.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Runner keeps tracking in the background and on the lock screen so locking your phone never pauses your run.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Use your location to show local weather and measure outdoor runs.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Runner uses motion data for step cadence and rhythm cues.</string>
 	<key>RunnerEnvironment</key>
 	<string>$(RUNNER_ENV)</string>
 	<key>UIBackgroundModes</key>
@@ -29,24 +41,16 @@
 		<string>bluetooth-central</string>
 		<string>bluetooth-peripheral</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Runner tracks your route, distance and pace while you run.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Runner keeps tracking in the background and on the lock screen so locking your phone never pauses your run.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Runner uses motion data for step cadence and rhythm cues.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Runner detects nearby runners for proximity encounters.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Runner reads workouts and heart rate to coach you mid-run.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Runner saves your finished runs to Health.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
 	</array>
+	<key>UIStatusBarHidden</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -30,8 +30,7 @@ struct AppDatabase: Sendable {
   }
 
   /// Live container in the shared app-group directory. Fails closed
-  /// when the group container is missing — a misconfigured entitlement
-  /// must crash at launch, not silently fork a second history.
+  /// when the group container is missing to avoid forking run history.
   static func live() throws -> AppDatabase {
     guard
       let directory = FileManager.default.containerURL(

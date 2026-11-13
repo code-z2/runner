@@ -6,7 +6,7 @@
 //
 
 /// Owns the app's stable UI-facing models. Each model is created only when
-/// its route first needs it, keeping construction out of `RootView.body`.
+/// it is first needed, keeping construction out of `RootView.body`.
 /// Screens bind these models; the models never reach into packages past
 /// their seams.
 @MainActor
@@ -23,5 +23,16 @@ final class AppViewModels {
 
   lazy var authState: AuthStateModel = {
     AuthStateModel(coordinator: app.auth, navigation: navigation)
+  }()
+
+  lazy var launch = LaunchViewModel(
+    location: app.permissions.location, navigation: navigation)
+
+  lazy var weather = WeatherModel(fetch: {
+    [service = app.weatherService] in await service.currentWeather()
+  })
+
+  lazy var run: RunViewModel = {
+    RunViewModel(runs: [], loadRuns: app.loadRunHistory)
   }()
 }
