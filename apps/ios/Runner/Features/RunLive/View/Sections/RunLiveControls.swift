@@ -13,9 +13,6 @@ struct RunLiveControls: View {
   private var offset: CGFloat = 0
 
   @State
-  private var confirmingFinish = false
-
-  @State
   private var finishes = 0
 
   @Environment(\.layoutDirection)
@@ -35,51 +32,46 @@ struct RunLiveControls: View {
       GeometryReader { geometry in
         let travel = max(0, geometry.size.width - Theme.Sizing.buttonHeight)
         let direction: CGFloat = layoutDirection == .rightToLeft ? -1 : 1
-        Button(action: { confirmingFinish = true }) {
-          Capsule()
-            .fill(Theme.Colors.surfaceRaised)
-            .overlay {
-              Text("Slide to finish")
-                .runnerText(.footnote)
-                .padding(.leading, Theme.Sizing.buttonHeight)
-            }
-            .overlay(alignment: .leading) {
-              Image(systemName: "arrow.forward")
-                .foregroundStyle(Theme.Colors.primaryForeground)
-                .frame(width: Theme.Sizing.tapTargetMin, height: Theme.Sizing.tapTargetMin)
-                .background(Theme.Colors.highlight, in: Circle())
-                .padding(.leading, Theme.Spacing.xs)
-                .offset(x: direction * min(offset, travel))
-                .gesture(
-                  DragGesture()
-                    .updating($offset) { value, state, _ in
-                      state = max(0, direction * value.translation.width)
+        Capsule()
+          .fill(Theme.Colors.surfaceRaised)
+          .overlay {
+            Text("Slide to finish")
+              .runnerText(.footnote)
+              .padding(.leading, Theme.Sizing.buttonHeight)
+              .accessibilityHidden(true)
+          }
+          .overlay(alignment: .leading) {
+            Image(systemName: "arrow.forward")
+              .foregroundStyle(Theme.Colors.primaryForeground)
+              .frame(width: Theme.Sizing.tapTargetMin, height: Theme.Sizing.tapTargetMin)
+              .background(Theme.Colors.highlight, in: Circle())
+              .padding(.leading, Theme.Spacing.xs)
+              .offset(x: direction * min(offset, travel))
+              .gesture(
+                DragGesture()
+                  .updating($offset) { value, state, _ in
+                    state = max(0, direction * value.translation.width)
+                  }
+                  .onEnded { value in
+                    if travel > 0, direction * value.translation.width >= travel * 0.8 {
+                      completeFinish()
                     }
-                    .onEnded { value in
-                      if travel > 0, direction * value.translation.width >= travel * 0.8 {
-                        completeFinish()
-                      }
-                    }
-                )
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Finish run")
+                  }
+              )
+              .accessibilityLabel("Finish run")
+              .accessibilityAddTraits(.isButton)
+              .accessibilityAction { completeFinish() }
+          }
       }
       .frame(height: Theme.Sizing.buttonHeight)
       .disabled(!canFinish)
     }
     .buttonStyle(.plain)
-    .confirmationDialog(
-      "Finish this run?", isPresented: $confirmingFinish, titleVisibility: .visible
-    ) {
-      Button("Finish run", action: completeFinish)
-      Button("Cancel", action: {})
-    }
     .sensoryFeedback(.success, trigger: finishes)
   }
 
   private func completeFinish() {
+    guard canFinish else { return }
     finishes += 1
     finish()
   }
