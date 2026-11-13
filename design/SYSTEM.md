@@ -1027,3 +1027,24 @@ Living record of what was built. Update on every completed item.
   before the stored manager reference is assigned.
 - The physical-device regression test starts and stops the live encounter
   tracker with both Core Bluetooth managers.
+
+## 2026-11-13 - Mainnet v1 deployment (chain + worker)
+
+- Item: live mainnet stack under `codez2.near`
+- What it is: developer account funded with 17.93 NEAR; subaccounts
+  `ije-v1-claims/escrow/relayer/seeder.codez2.near` (4 / 5 / 0.5 / 0.5);
+  DAO `ije-v1.sputnik-dao.near` via factory with boot council
+  (`codez2.near`, `ije-joel.near`), runner policy enacted by 2-of-2 vote
+  (council/community/claims, 0.1 N bond); treasury `84c58ba7` and escrow
+  `77a525b5` deployed with mainnet init args (Circle USDC 17208628...6a1c331a1,
+  DAO pool, 0.005 seed, $5 min-lock); DAO/claims/escrow registered on USDC;
+  worker `4fd0459c` at 100% with production attestation, mainnet RPC, fresh
+  `runner-api-mainnet` D1, mainnet secrets
+- How it was done: near-cli-rs from the user's Terminal (keychain signing),
+  verification by RPC after every step, reproducible release builds
+- Why this way: DEPLOY.md order; each account pays its own storage;
+  server keys are fresh full-access keys, owner keys never leave the keychain
+- Importance: mainnet is live except the DAO USDC pool, deliberately left
+  empty so no payouts run until funded; escrow works standalone
+- Metadata: apps/api/wrangler.toml, apps/api/package.json,
+  apps/api/scripts/dao-policy.mainnet.json; 2026-11-13
