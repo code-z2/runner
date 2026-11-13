@@ -38,11 +38,16 @@ extension Theme {
         let base: Font
         switch family {
         case .serif where RunnerFonts.register():
-          base = .custom(italic ? RunnerFonts.serifItalic : RunnerFonts.serifRegular, fixedSize: size)
+          base = .custom(
+            italic ? RunnerFonts.serifItalic : RunnerFonts.serifRegular, fixedSize: size)
         case .serif:
-          base = italic ? .system(size: size, design: .serif).italic() : .system(size: size, design: .serif)
+          base =
+            italic
+            ? .system(size: size, design: .serif).italic() : .system(size: size, design: .serif)
         case .system:
-          base = italic ? .system(size: size, weight: weight).italic() : .system(size: size, weight: weight)
+          base =
+            italic
+            ? .system(size: size, weight: weight).italic() : .system(size: size, weight: weight)
         }
         return monospacedDigits ? base.monospacedDigit() : base
       }
@@ -94,6 +99,10 @@ extension Theme {
         lineHeight: Primitive.LineHeight.tight, textStyle: .largeTitle)
       public static let stat = system(
         Primitive.FontSize.stat, .medium, monospacedDigits: true,
+        lineHeight: Primitive.LineHeight.snug, textStyle: .title2)
+
+      public static let statLight = system(
+        Primitive.FontSize.stat, .regular, monospacedDigits: true,
         lineHeight: Primitive.LineHeight.snug, textStyle: .title2)
 
       public static let button = system(

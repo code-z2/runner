@@ -71,6 +71,7 @@ enum Primitive {
     static let slate: UInt32 = 0x57554F
     static let ink: UInt32 = 0x1C1813
     static let bronze: UInt32 = 0x8E6B35
+    static let bronzeText: UInt32 = 0x9B7F4F
     static let brandGold: UInt32 = 0xB8893F
     static let gold: UInt32 = 0xE2C690
     static let brick: UInt32 = 0xD4433A

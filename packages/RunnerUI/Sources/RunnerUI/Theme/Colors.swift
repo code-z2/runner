@@ -17,6 +17,7 @@ extension Theme {
       light: Primitive.Hex.taupe, dark: Primitive.Hex.slate)
 
     public static let primary = Color(light: Primitive.Hex.bronze, dark: Primitive.Hex.gold)
+    public static let actionText = Color(light: Primitive.Hex.bronzeText, dark: Primitive.Hex.gold)
     public static let primaryForeground = Color(
       light: Primitive.Hex.ivoryRaised, dark: Primitive.Hex.goldInk)
 
