@@ -20,7 +20,7 @@ struct AppDatabase: Sendable {
 
   /// In-memory container for tests and previews. Never ships data.
   static func ephemeral() throws -> AppDatabase {
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV1.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try ModelContainer(
       for: schema,
@@ -36,8 +36,12 @@ struct AppDatabase: Sendable {
       let directory = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: groupIdentifier)
     else { throw AppDatabaseError.noAppGroupContainer }
+    return try persistent(in: directory)
+  }
+
+  static func persistent(in directory: URL) throws -> AppDatabase {
     let configuration = ModelConfiguration(url: directory.appending(path: "runner.store"))
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV1.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
     let container = try ModelContainer(
       for: schema,
       migrationPlan: RunnerStoreMigrationPlan.self,

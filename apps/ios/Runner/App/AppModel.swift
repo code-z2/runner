@@ -7,8 +7,10 @@
 
 import Foundation
 import RunnerAuth
+import RunnerCadence
 import RunnerGateway
 import RunnerHealthKit
+import RunnerLocation
 import RunnerNear
 import RunnerSession
 import RunnerStore
@@ -40,7 +42,9 @@ final class AppModel {
 
   let permissions: PermissionServices
 
-  let recovery: RunRecovery
+  let runLocation = LocationTracker(source: LiveLocationUpdateSource())
+
+  let runCadence = CadenceTracker(source: LiveCadenceUpdateSource())
 
   let snapshots: FileSessionSnapshotStore
 
@@ -55,10 +59,7 @@ final class AppModel {
   func loadRunHistory() async throws -> [RunSummary] {
     let store = try runStore.get()
     let records = try await store.recentRuns()
-    return records.map {
-      RunSummary(
-        id: $0.id, distanceMeters: $0.distanceMeters, elapsed: $0.activeElapsed, date: $0.startedAt)
-    }
+    return records.map(RunSummary.init(record:))
   }
 
   init() {
@@ -97,7 +98,6 @@ final class AppModel {
         return try await resolver.resolve(session: session)
       })
     permissions = PermissionServices()
-    recovery = RunRecovery()
     let support = FileManager.default.urls(
       for: .applicationSupportDirectory, in: .userDomainMask
     ).first!

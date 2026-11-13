@@ -20,12 +20,22 @@ struct RootView: View {
 
   var body: some View {
     HomeView(
-      run: viewModels.run, weatherModel: viewModels.weather, navigation: homeNavigation
+      run: viewModels.run, live: viewModels.live, weatherModel: viewModels.weather,
+      navigation: homeNavigation
     )
     .accessibilityHidden(navigation.route == .launch)
     .allowsHitTesting(navigation.route != .launch)
     .task(id: HomeRefresh(phase: scenePhase, route: navigation.route)) {
+      if scenePhase == .background {
+        await viewModels.live.checkpoint()
+        return
+      }
       guard scenePhase == .active, navigation.route != .launch else { return }
+      do {
+        try await viewModels.live.recover()
+      } catch {
+        // Starting a run retries recovery before it can replace the draft.
+      }
       await viewModels.run.refreshHistory()
       await viewModels.weather.refresh()
     }
@@ -43,7 +53,7 @@ struct RootView: View {
     }
     .preferredColorScheme(.light)
     .onChange(of: navigation.route) { _, route in
-      if route == .launch { homeNavigation.path.removeAll() }
+      if route == .launch, !viewModels.live.hasSession { homeNavigation.path.removeAll() }
     }
     .onChange(of: scenePhase) { _, phase in
       navigation.phase = ScenePhaseBridge(phase)

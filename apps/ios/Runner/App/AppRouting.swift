@@ -73,7 +73,7 @@ enum HomeDestination: Hashable, Sendable {
 
   case live(distanceKilometers: Double?)
 
-  case summary(elapsed: TimeInterval)
+  case summary(RunSummary)
 
   case savedSummary(RunSummary)
 }
@@ -85,6 +85,11 @@ final class HomeNavigation {
   var path: [HomeDestination] = []
 
   var showingPacePilot = false
+
+  func updatePathFromNavigationStack(_ proposedPath: [HomeDestination]) {
+    if case .live = path.last, proposedPath != path { return }
+    path = proposedPath
+  }
 
   func openPacePilot() {
     showingPacePilot = true

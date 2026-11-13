@@ -25,13 +25,15 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>Runner reads workouts and heart rate to coach you mid-run.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Runner saves your finished runs to Health.</string>
+	<string>Runner saves completed running workouts and their measured distance to Apple Health when you connect it.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Runner keeps tracking in the background and on the lock screen so locking your phone never pauses your run.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Use your location to show local weather and measure outdoor runs.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Runner uses motion data for step cadence and rhythm cues.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>RunnerEnvironment</key>
 	<string>$(RUNNER_ENV)</string>
 	<key>UIBackgroundModes</key>

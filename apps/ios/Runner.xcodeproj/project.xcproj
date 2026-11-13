@@ -24,6 +24,12 @@
       "path": "../../packages/RunnerGateway",
     }, {
       "kind": "local",
+      "path": "../../packages/RunnerLocation",
+    }, {
+      "kind": "local",
+      "path": "../../packages/RunnerCadence",
+    }, {
+      "kind": "local",
       "path": "../../packages/RunnerSession",
     }, {
       "kind": "local",
@@ -86,6 +92,7 @@
         { "path": "Features/RunSummary/Model/RunSplit.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Shared/ClaimPass/ClaimPassBannerContent.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Shared/ClaimPass/ClaimPassBanner.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/RunLive/ViewModel/RunLiveViewModel.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunLive/View/Pages/RunLivePage.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunLive/View/Sections/PacePilotStatusCard.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunLive/View/Sections/RunLiveControls.swift", "target-membership": [ "Runner/compile-sources" ] },
@@ -203,7 +210,20 @@
           ],
         },
       ],
+    }, {
+      "kind": "group",
+      "path": "RunnerActivity",
+      "children": [
+        { "path": "RunActivityAttributes.swift", "target-membership": [
+          "Runner/compile-sources", "RunnerActivity/compile-sources"
+        ] },
+        { "path": "RunnerActivityWidget.swift", "target-membership": [
+          "RunnerActivity/compile-sources"
+        ] },
+        { "path": "Info.plist" },
+      ],
     },
+    { "path": "<PRODUCTS>/RunnerActivity.appex", "id": "B34FF57BBDFC3471A13B27E6", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "Runner/copy/Embed App Extensions", "header-preservation": "remove-on-copy" } ] },
   ],
   "targets": [
     {
@@ -217,10 +237,18 @@
         { "name": "Release", "file": "Config/Release.xcconfig" },
         { "name": "Staging", "file": "Config/Staging.xcconfig" },
       ],
+      "dependencies": [
+        "RunnerActivity",
+      ],
       "build-phases": [
         "compile-sources",
         "frameworks",
         "resources",
+        {
+          "kind": "copy",
+          "name": "Embed App Extensions",
+          "bundle-base-path": "plugins-directory",
+        },
       ],
       "package-product-members": [
         {
@@ -244,6 +272,10 @@
           "product-name": "RunnerAuth",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "RunnerCadence",
+          "product-name": "RunnerCadence",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "RunnerGateway",
           "product-name": "RunnerGateway",
           "build-phase": { "build-phase": "frameworks" },
@@ -258,6 +290,10 @@
         }, {
           "package": "RunnerHealthKit",
           "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerLocation",
+          "product-name": "RunnerLocation",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "RunnerSession",
@@ -292,6 +328,39 @@
         "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije",
         "PRODUCT_NAME": "Runner",
         "SDKROOT": "iphoneos",
+        "SWIFT_VERSION": "6.0",
+        "TARGETED_DEVICE_FAMILY": "1",
+      },
+    }, {
+      "name": "RunnerActivity",
+      "id": "87A08DE112844307A846F1F1",
+      "product": "RunnerActivity.appex",
+      "product-type": "app-extension",
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "RunnerUI",
+          "product-name": "RunnerUI",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "APPLICATION_EXTENSION_API_ONLY": "YES",
+        "CODE_SIGN_ENTITLEMENTS": "",
+        "DEVELOPMENT_TEAM": "QHUBYNZ482",
+        "INFOPLIST_FILE": "RunnerActivity/Info.plist",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije.activity",
+        "PRODUCT_NAME": "RunnerActivity",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "MARKETING_VERSION": "0.1.0",
+        "CURRENT_PROJECT_VERSION": "1",
+        "SDKROOT": "iphoneos",
+        "SKIP_INSTALL": "YES",
         "SWIFT_VERSION": "6.0",
         "TARGETED_DEVICE_FAMILY": "1",
       },
@@ -339,6 +408,14 @@
           "product-name": "RunnerAuthTesting",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "RunnerCadence",
+          "product-name": "RunnerCadence",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerCadence",
+          "product-name": "RunnerCadenceTesting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "RunnerGateway",
           "product-name": "RunnerGateway",
           "build-phase": { "build-phase": "frameworks" },
@@ -353,6 +430,10 @@
         }, {
           "package": "RunnerHealthKit",
           "product-name": "RunnerHealthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerLocation",
+          "product-name": "RunnerLocation",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "RunnerSession",

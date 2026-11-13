@@ -741,3 +741,79 @@ Living record of what was built. Update on every completed item.
   navigation containers can lay out before they become visible.
 - Three recorded iPhone simulator launches from a terminated process
   showed Home fading in at full size without the top-left expansion.
+
+## Fitness engine integration
+
+- Live uses RunnerSession for active time and manual pause, resume, and finish.
+  RunnerLocation and RunnerCadence supply the measured metrics. Pause stops the
+  sensor streams and resume starts a fresh GPS segment.
+- RunnerStore commits the completed run locally before Summary opens. A draft
+  keeps the run ID, elapsed time, distance, and finish reason until the history
+  commit succeeds, so recovery can safely retry the same run after termination.
+- The iOS integration test covers manual transitions, reopening the on-disk
+  store, and recovering an interrupted run once. Device sensor verification
+  and Apple Health workout export remain open.
+- The run model owns periodic checkpoints and saves once more when the app
+  backgrounds. Recovery no longer depends on the Live screen's refresh timer.
+- The location integration test feeds two GPS segments around a pause and
+  checks that only their measured distance reaches the saved run.
+- A newly completed Summary offers explicit Apple Health export after the
+  local commit. RunnerSession carries pause intervals to the existing
+  HealthKit builder, and HealthKit sync IDs use the same run ID for retries.
+  Export is available from the immediate Summary and needs a device check.
+- Session tests verify the exact pause intervals passed to HealthKit, including
+  a run finished while paused. Xcode confirmed the installed export build
+  launches on the connected iPhone 16 Pro.
+- The simulator UI check exercised Countdown, Live, pause, resume, Finish,
+  Summary, and History. The same 0:34 run reopened in History after a full
+  process restart. Physical movement, lock-screen recording, and the Apple
+  Health write still require the iPhone check.
+- Device feedback: retain the last measured cadence in new run history,
+  preserve old records with a lightweight migration, derive current pace
+  from timestamped GPS deltas when speed is missing, and display average
+  pace in min/km. Give Last Run more clearance above the tab bar.
+- Summary now offers one Apple Health connection for future manually
+  finished runs. The system controls Health permissions, and interrupted
+  run recovery writes only to Runner history.
+- Pace on the Ready card, History, and Summary always renders minutes and
+  seconds, including paces over an hour per kilometer. Live average pace
+  retains its whole-minute min/km display.
+- An iOS regression test verifies that Apple Health opt-in survives rebuilding
+  the run model, only an opted-in finish reaches the Health gateway, and
+  interrupted and pre-opt-in runs remain in local history.
+- The simulator cadence regression sends a measured 158 spm through the
+  cadence tracker, finishes while paused, and checks Summary and History.
+- Average pace now truncates to whole minutes and caps the displayed value
+  at 120+ min/km across Live, Ready, History, and Summary. Live current pace
+  keeps minutes and seconds.
+- Summary reads Apple Health workout authorization immediately and refreshes
+  on activation. The connection row combines that permission with Runner's
+  automatic-export opt-in.
+- Ready moves Start up 8 points and tightens the gaps above Last Run so
+  the card clears the floating tab bar sooner. Summary uses a 24-point
+  Apple Health icon beside its label.
+- Live current pace displays a dash above 120 minutes per kilometer.
+  Average pace continues to display 120+ min/km above the same threshold.
+- The iPhone field retest confirmed that Live displays a dash for very slow
+  current pace and a newly finished run appears automatically in Fitness
+  after Apple Health is connected.
+
+## Workout Live Activity
+
+- Runner starts an iPhone HealthKit workout session when Apple Health is
+  connected. RunnerSession still owns workout state and local history.
+  In-app pause, resume, and finish drive the system session.
+- A local WidgetKit extension displays the run timer and measured distance
+  on the Lock Screen and the run timer in Dynamic Island. It uses RunnerUI
+  typography and colors and exposes no workout controls.
+- The navigation stack cannot pop an active Live route. Finishing still
+  replaces Live with Summary, where the native back navigation is available.
+- The iOS simulator suite passed 37 tests, including the route guard.
+  On-device activity rendering and gesture behavior remain to be verified.
+- ActivityKit updates carry the timestamp of the state snapshot. A late
+  distance update from before Pause cannot overwrite the paused display.
+- The run integration test verifies the ordered HealthKit gateway lifecycle
+  for an opted-in run and confirms recovery does not start a system workout.
+- The iPhone retest confirmed that the Live Activity appears on the Lock
+  Screen and Dynamic Island, freezes on Pause, and disappears on Finish.
+  Swiping back during the run leaves Live on screen.
