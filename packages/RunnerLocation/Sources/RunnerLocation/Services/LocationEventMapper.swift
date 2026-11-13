@@ -28,12 +28,10 @@ enum LocationEventMapper {
             return [.locationUnavailable]
         }
 
-        var events: [LocationEvent] = [.sample(LocationSampleModel(from: location))]
+        var events: [LocationEvent] =
+            flags.stationary ? [.stationary] : [.sample(LocationSampleModel(from: location))]
         if flags.accuracyLimited {
             events.append(.accuracyReduced)
-        }
-        if flags.stationary {
-            events.append(.stationary)
         }
         return events
     }

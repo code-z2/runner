@@ -85,12 +85,12 @@ struct LocationEventMapperTests {
     }
 
     @Test
-    func stationaryIsReportedAlongsideSample() {
+    func stationaryFixDoesNotEmitDistanceSample() {
         let events = LocationEventMapper.events(
             location: location(),
             flags: LocationUpdateFlags(stationary: true)
         )
 
-        #expect(events.contains(.stationary))
+        #expect(events == [.stationary])
     }
 }

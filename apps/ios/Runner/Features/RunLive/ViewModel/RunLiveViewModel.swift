@@ -331,6 +331,11 @@ final class RunLiveViewModel: AppViewModelType {
     switch event {
     case .sample(let sample):
       guard sample.timestamp >= startedAt, sample.horizontalAccuracy >= 0 else { return }
+      if sample.speed == 0 {
+        previousLocation = nil
+        pace = nil
+        return
+      }
       var measuredSpeed: Double?
       if let previousLocation {
         guard sample.timestamp > previousLocation.timestamp else { return }
@@ -346,6 +351,7 @@ final class RunLiveViewModel: AppViewModelType {
       previousLocation = sample
       pace = (sample.speed ?? measuredSpeed).flatMap { $0.isFinite && $0 > 0 ? 1_000 / $0 : nil }
     case .stationary:
+      previousLocation = nil
       pace = nil
     case .accuracyReduced:
       break
