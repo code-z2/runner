@@ -817,3 +817,213 @@ Living record of what was built. Update on every completed item.
 - The iPhone retest confirmed that the Live Activity appears on the Lock
   Screen and Dynamic Island, freezes on Pause, and disappears on Finish.
   Swiping back during the run leaves Live on screen.
+
+## PacePilot live audio
+
+- Runner links the existing rules and scheduler to the opted-in countdown
+  and active workout. The first slice speaks distance and goal marks,
+  stopped and low-battery nudges, and shows the measured coaching state.
+  Pausing or finishing cancels pending speech.
+- PacePilot uses on-device Apple speech and prefers the highest-quality
+  installed English voice, with a Premium voice first and the device
+  locale breaking quality ties. iOS manages speech audio and ducking.
+- The next PacePilot slice unlocks after ten locally saved, user-finished
+  runs strictly longer than 2.5 km. The ten latest qualifying runs supply
+  a median cadence target when measurements exist. The coach shares a
+  playback slot between speech and a short alternating step pattern,
+  which stops repeating once cadence is within the target band.
+- Playback on a locked iPhone and music ducking require a device check.
+
+### Countdown playback and preview
+
+- PacePilot and the pre-run screen share one countdown sequence. Each number
+  gets at least one second, and the next number or the run starts after
+  the current cue finishes. Leaving either screen cancels its own playback.
+- Play countdown in PacePilot previews the same three spoken cues without
+  changing the coaching preference or starting a workout.
+
+## Encounters wiring
+
+- One shared EncounterTracker per launch snapshots counts at run start
+  and diffs at finish into RunSummary.encounters, so the ledger survives
+  pause and resume. Tracking runs only when Bluetooth permission is ready.
+  No view changed; the summary card already rendered the slot.
+- The buzz is a fixed double-double notification pulse with no intensity
+  grading. Sightings still pass the grader as a throttle only.
+- The scanner and advertiser build their CoreBluetooth managers on first
+  start, not in init, so app boot and test hosts never touch Bluetooth
+  hardware. This mirrors LiveLocationUpdateSource, whose hardware comes
+  up in start().
+
+## 2026-11-13 — Kokoro voice benchmark (PacePilot screen)
+
+- Item: two buttons on the PacePilot opt-in screen benchmark the bundled
+  Kokoro-82M CoreML checkpoints (FP16 325 MB vs INT8 83 MB) on the same
+  coaching cue, "Nice and steady. Settle into your rhythm." Each button
+  unpacks its model on first tap (timed), synthesizes (timed), plays the
+  audio through the existing CoachAudioPlayback path, and reports load /
+  synth / audio seconds plus real-time factor. Later taps reuse the loaded
+  model, showing warm times; audio quality is judged by ear.
+- What it is: `packages/RunnerKokoro` (actor `KokoroBenchmarkService`,
+  offline load via speech-swift `fromPretrained`, per-variant serial queue
+  so blocking CoreML calls never stall the cooperative thread pool);
+  `PacePilotOptInPage` gains a `KokoroBenchmarkSection` with two
+  `KokoroBenchmarkRow` views; models ship as two zips in
+  `Runner/Resources/KokoroModels/` (LFS-tracked) unpacked to Application
+  Support on first use, because Copy Bundle Resources flattens
+  same-basename files and the two variants share every filename.
+- How it was done: repos cloned from HuggingFace and LFS-pulled locally;
+  `RunnerKokoro` wraps speech-swift (pinned revision) + ZIPFoundation as a
+  local package following the repo's flat-package convention; verified by
+  the Runner-scheme app build and `swift test` in packages/RunnerKokoro.
+- Why this way: zips keep the bundle collision-free and preserve the exact
+  HF layout the SDK expects; the SDK (Apache-2.0) does G2P, chunking and
+  vocoding instead of reimplementing the pipeline.
+- Importance: lets Peter decide on-device whether the 83 MB INT8 model
+  sounds as good as the 325 MB one before committing PacePilot to either.
+- Metadata: packages/RunnerKokoro, PacePilotOptInPage, project.xcproj
+  (RunnerKokoro product, 2 resource entries), .gitattributes (LFS);
+  2026-11-13
+- Gaps: Mac e2e numbers only (FP16 RTF 3.41 vs INT8 RTF 0.77 on M4 Pro);
+  on-device ANE numbers pending Peter's run. `swift format` compliance not
+  re-checked from the sandbox. RunnerTests target still lacks a development
+  team, so build-for-testing fails (pre-existing, untouched).
+
+## 2026-11-13 — Kokoro compute-unit fallback (device MPSGraph failure)
+
+- Follow-up: both buttons failed on-device at first load — iOS 26's GPU
+  compiler (MPSGraph, `MPSReorderOperations`) rejects a transpose in the
+  model graph (`axes in perm tensor must be unique`). macOS accepts the
+  identical bytes, so this is device-OS codegen, not file corruption:
+  the bundled zips round-trip byte-identical (sha256 matches the HF LFS
+  oid) and synthesize fine from the unzipped bytes.
+- `KokoroBenchmarkService` now loads with `all`, then falls back to
+  `cpuAndNeuralEngine`, then `cpuOnly` (`firstSuccessful`, unit-tested).
+  The result line reports which units ran (`all`/`ane`/`gpu`/`cpu`), so
+  the INT8-vs-FP16 comparison stays on equal hardware.
+- Metadata: packages/RunnerKokoro, PacePilotOptInPage metrics line;
+  2026-11-13
+- Gaps: fallback verified by unit tests + Mac e2e only; the true test is
+  Peter's device re-run (expect `ane` or `cpu` in the result line).
+
+## 2026-11-13 — Kokoro trial prediction per unit (load succeeded, inference failed)
+
+- Follow-up: device log showed `Loaded Kokoro E2E model` / `model loaded
+  successfully` BEFORE the MPSGraph errors — CoreML compiles GPU programs
+  lazily, so load succeeding proves nothing. The per-unit attempt now runs
+  a trial synthesis (`hello`) and only accepts a unit that predicts; the
+  trial also warms the model, so timed synth numbers are steady-state.
+  Upstream has no newer export (both SHAs match), so fallback stands.
+- Metadata: packages/RunnerKokoro `loadFromDirectory`; 2026-11-13
+- Gaps: device re-run still pending; expect `ane` or `cpu` in the line.
+
+## 2026-11-13 — Kokoro locked to CPU (background constraint)
+
+- Peter: the coach speaks from the background, where the GPU is off, so
+  inference must be CPU — which is also why this is CoreML. Fallback list
+  is now CPU-only; the line still reports `cpu` for the record.
+- Metadata: packages/RunnerKokoro `unitFallbacks`; 2026-11-13
+
+## 2026-11-13 — Audio session off main thread (benchmark findings)
+
+- Peter's device findings: cold load ~10s FP16 / ~9s INT8 (one-time unzip
+  + CoreML compile), warm synth ~1s for 3.4s audio on both — speed is a
+  wash on CPU, so the pick is quality-by-ear plus size (83 vs 325 MB).
+- Fixed the `AVAudioSession ... main thread` warnings his log showed:
+  `CoachAudioPlayback.play` now applies/releases the session on a
+  detached background task; engine start/stop stay on main. Covers the
+  countdown and benchmark paths, and coaching later.
+- The boot-UUID/linguisticdata lines in his log are harmless OS noise.
+- Metadata: CoachAudioPlayback.swift; 2026-11-13
+
+## 2026-11-13 — TTS decision: Kokoro INT8 (83 MB)
+
+- Peter's verdict after on-device comparison: both voices sound the same,
+  so the 83 MB INT8 model wins outright over the 325 MB FP16 one.
+- Next: wire live coaching to INT8 and drop FP16 from the bundle.
+- Metadata: decision only, no code change; 2026-11-13
+
+### Run controls and PacePilot UI cleanup
+
+- The live finish control completes a run on a full slide and offers
+  an accessible Finish run action. Ordinary taps on the track no
+  longer open a confirmation dialog.
+- PacePilot opt-in shows the coaching settings without the temporary
+  model audition controls now that voice comparisons are complete.
+
+## 2026-11-13 — Kokoro INT8 wired into live coaching
+
+- Peter chose INT8: same voice as FP16 on the cues, quarter of the space,
+  ~2s faster cold start. FP16 removed from the bundle (INT8 zip only);
+  live coaching now speaks through it with Apple speech as fallback.
+- What it is: `KokoroCueRenderer` (app layer, `@MainActor`, no shared
+  mutable state) tries Kokoro then falls back to `SystemSpeechRenderer`
+  per cue; countdown cues never speak anywhere — the 3-2-1 is visual only
+  (`RunCountdownPage` ticks, `playCountdown` lost its coach arg).
+  Brain spells out every spoken number (`SpelledOutNumber`, en_US), e.g.
+  "Kilometer one. Your average pace is six minutes and twenty seconds
+  per kilometer." `RunCoach` preloads the ~9s cold load at countdown
+  entry and run start without blocking either; cancelled at run end.
+  Opt-in page demos the two audition sentences with timing.
+- Why this way: backgrounded apps get no GPU, so CPU-only; the model
+  stays loaded for the run, so only the first cue could wait — and the
+  earliest cue fires minutes in. Preload handle is a stored Task,
+  cancelled in `end()`; concurrent loads serialize on the service actor.
+- Importance: first on-device verdict loop closed (user compared voices);
+  iPhone 14 + locked-screen playback still needs Peter's field check.
+- Metadata: KokoroCueRenderer.swift, RunCoach, RunCountdownPage,
+  PacePilotOptInPage, SpelledOutNumber, RulesCoachBrain + tests,
+  project.xcproj (INT8 zip only); 2026-11-13
+- Gaps: first-cue latency and locked-screen playback unverified below
+  iPhone 16 Pro — needs the iPhone 14 field run.
+
+## 2026-11-13 — Kokoro out of git, into E2E
+
+- Per Peter: the Kokoro benchmark does not live in git. The entire
+  `RunnerKokoro` package plus the INT8 zip moved to `apps/ios/E2E/`
+  (gitignored, on-disk only like the other harnesses); the project
+  references them via `../E2E/` paths. Code stays imported by the app
+  target as before; fresh clones build without the voice and fall back
+  to Apple speech. LFS config removed — nothing left to track.
+- Metadata: apps/ios/E2E/RunnerKokoro, apps/ios/E2E/KokoroModels (zip
+  only), project.xcproj; 2026-11-13
+
+## 2026-11-13 — Kokoro split: production into PacePilot, benchmark stays E2E
+
+- Per Peter: the benchmark must not live in git, and the non-benchmark
+  voice code belongs in the PacePilot package. Split accordingly.
+- `KokoroBenchmarkService` (+ variants, errors, load/synth/unload) moved
+  to `RunnerPacePilot` with its speech-swift/ZIPFoundation deps; the app
+  imports it from there. `apps/ios/E2E/RunnerKokoro` keeps only the
+  timing struct, the `run()` harness and its tests, depending on the
+  PacePilot package by path. E2E is gitignored; fresh clones build and
+  fall back to Apple speech.
+- Noted: a peer rewrote PacePilotOptInPage mid-task; the audition section
+  was re-added on top of their version, otherwise untouched.
+- Metadata: RunnerPacePilot (service + tests), E2E/RunnerKokoro,
+  project.xcproj; 2026-11-13
+
+### Encounter and PacePilot integration audit
+
+- Live shows measured encounter totals. Finished runs persist all three
+  counts in run history using an additive SwiftData migration. Older
+  records keep their existing data and have no encounter measurements.
+- Encounter startup rolls back on scanner failure. Bluetooth manager
+  callbacks and lifecycle calls share main-actor isolation, and pauses
+  reset continuous dwell timing. A stationary Core Location update no
+  longer contributes distance.
+- PacePilot keeps the countdown visual. Opted-in runs begin loading
+  Kokoro INT8 during countdown. Apple speech handles cues while the
+  model is loading, on unsupported phones, and when synthesis fails.
+  Model extraction is staged and concurrent requests share a load.
+- The local model archive stays under ignored E2E. The synchronized
+  folder lets Xcode include it when present and build without it.
+
+### Core Bluetooth startup crash
+
+- Pass each restoration delegate into its Core Bluetooth manager initializer.
+  iOS checks for the restoration callback during initialization. Delegate
+  callbacks use the manager passed to them so they can handle startup events
+  before the stored manager reference is assigned.
+- The physical-device regression test starts and stops the live encounter
+  tracker with both Core Bluetooth managers.
