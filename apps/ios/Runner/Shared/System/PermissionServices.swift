@@ -10,6 +10,7 @@ import CoreLocation
 import CoreMotion
 import HealthKit
 import Observation
+import RunnerHealthKit
 
 /// Location permission, separated from the tracking engine. The app asks
 /// WhenInUse first and upgrades to Always only when a run needs the
@@ -193,9 +194,12 @@ final class HealthKitPermissionService {
   }
 
   func requestAccess() async throws {
+    guard let heartRate = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+      throw HealthKitError.unavailable
+    }
     try await store.requestAuthorization(
       toShare: [HKObjectType.workoutType()],
-      read: [HKObjectType.workoutType(), HKObjectType.quantityType(forIdentifier: .heartRate)!])
+      read: [HKObjectType.workoutType(), heartRate])
     refresh()
   }
 

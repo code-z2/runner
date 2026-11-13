@@ -1,55 +1,66 @@
-//
-//  RootView.swift
-//  Runner
-//
-//  Created by Peter on 09/11/2026.
-//
-
 import SwiftUI
 
-/// App root. Resolves the session on launch, then renders the route.
-/// Screens arrive with their features; every route is an empty shell
-/// until then — no UI is built here.
 struct RootView: View {
 
   @Environment(\.scenePhase)
   private var scenePhase
 
-  private let app: AppModel
+  @State
+  private var viewModels: AppViewModels
+
+  @State
+  private var homeNavigation = HomeNavigation()
 
   private let navigation: RootNavigation
 
-  @State
-  private var models: AppViewModels
-
   init(app: AppModel, navigation: RootNavigation) {
-    self.app = app
     self.navigation = navigation
-    _models = State(wrappedValue: AppViewModels(app: app, navigation: navigation))
+    _viewModels = State(initialValue: AppViewModels(app: app, navigation: navigation))
   }
 
   var body: some View {
-    ZStack {
-#if DEBUG
-      StagingDriverView(app: app)
-#else
-      switch navigation.route {
-      case .launch:
-        EmptyView()
-      case .auth:
-        EmptyView()
-      case .home:
-        EmptyView()
+    HomeView(
+      run: viewModels.run, weatherModel: viewModels.weather, navigation: homeNavigation
+    )
+    .accessibilityHidden(navigation.route == .launch)
+    .allowsHitTesting(navigation.route != .launch)
+    .task(id: HomeRefresh(phase: scenePhase, route: navigation.route)) {
+      guard scenePhase == .active, navigation.route != .launch else { return }
+      await viewModels.run.refreshHistory()
+      await viewModels.weather.refresh()
+    }
+    .overlay {
+      if navigation.route == .launch {
+        LaunchPage()
+          .transition(.identity)
+          .task(
+            id: LaunchRequest(
+              phase: ScenePhaseBridge(scenePhase), status: viewModels.launch.locationStatus)
+          ) {
+            await viewModels.launch.resolve(phase: ScenePhaseBridge(scenePhase))
+          }
       }
-#endif
     }
-    .task {
-      await models.authState.resolve()
+    .preferredColorScheme(.light)
+    .onChange(of: navigation.route) { _, route in
+      if route == .launch { homeNavigation.path.removeAll() }
     }
-    .onChange(of: scenePhase) { _, newPhase in
-      navigation.phase = ScenePhaseBridge(newPhase)
+    .onChange(of: scenePhase) { _, phase in
+      navigation.phase = ScenePhaseBridge(phase)
     }
   }
+}
+
+private struct HomeRefresh: Equatable {
+
+  let phase: ScenePhase
+  let route: RunnerRoute
+}
+
+private struct LaunchRequest: Equatable {
+
+  let phase: ScenePhaseBridge
+  let status: LocationPermissionService.Status
 }
 
 extension ScenePhaseBridge {

@@ -63,6 +63,38 @@ final class RootNavigation {
   init() {}
 }
 
+enum HomeDestination: Hashable, Sendable {
+
+  case community
+
+  case history
+
+  case countdown(distanceKilometers: Double?)
+
+  case live(distanceKilometers: Double?)
+
+  case summary(elapsed: TimeInterval)
+
+  case savedSummary(RunSummary)
+}
+
+@Observable
+@MainActor
+final class HomeNavigation {
+
+  var path: [HomeDestination] = []
+
+  var showingPacePilot = false
+
+  func openPacePilot() {
+    showingPacePilot = true
+  }
+
+  func open(_ destination: HomeDestination) {
+    path.append(destination)
+  }
+}
+
 /// Scene phase without importing SwiftUI into services. `RootView` maps
 /// the real `ScenePhase` onto this value.
 enum ScenePhaseBridge: Equatable, Sendable {

@@ -9,20 +9,27 @@ public struct PillButtonStyle: ButtonStyle {
   }
 
   let variant: Variant
+  let compact: Bool
 
   @Environment(\.isEnabled) private var isEnabled
 
-  public init(_ variant: Variant = .primary) {
+  public init(_ variant: Variant = .primary, compact: Bool = false) {
     self.variant = variant
+    self.compact = compact
   }
 
   public func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .runnerText(.button)
+      .runnerText(compact ? .caption : .button)
       .foregroundStyle(foreground)
-      .frame(maxWidth: .infinity, minHeight: Theme.Sizing.buttonHeight)
+      .padding(.horizontal, compact ? Theme.Spacing.md : 0)
+      .frame(
+        maxWidth: compact ? nil : .infinity,
+        minHeight: compact ? Theme.Sizing.chipHeight : Theme.Sizing.buttonHeight
+      )
       .background(background, in: Capsule())
-      .contentShape(Capsule())
+      .frame(minWidth: Theme.Sizing.tapTargetMin, minHeight: Theme.Sizing.tapTargetMin)
+      .contentShape(Rectangle())
       .opacity(opacity(pressed: configuration.isPressed))
       .scaleEffect(configuration.isPressed ? Theme.Interaction.pressedScale : 1)
       .animation(.snappy(duration: 0.18), value: configuration.isPressed)
@@ -51,7 +58,9 @@ public struct PillButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == PillButtonStyle {
-  public static func pill(_ variant: PillButtonStyle.Variant = .primary) -> PillButtonStyle {
-    PillButtonStyle(variant)
+  public static func pill(
+    _ variant: PillButtonStyle.Variant = .primary, compact: Bool = false
+  ) -> PillButtonStyle {
+    PillButtonStyle(variant, compact: compact)
   }
 }

@@ -25,6 +25,7 @@ extension Theme {
   }
 
   public enum Sizing {
+    public static let countdownDiameter: CGFloat = 280
     public static let tapTargetMin = Primitive.Dimension.tapTargetMin
     public static let chipHeight = Primitive.Dimension.chipHeight
     public static let buttonHeight = Primitive.Dimension.buttonHeight

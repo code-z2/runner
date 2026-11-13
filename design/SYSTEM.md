@@ -526,3 +526,218 @@ Living record of what was built. Update on every completed item.
 - Gaps: not compiled yet (no Swift toolchain on the Windows machine); Peter
   needs to run `swift test` in packages/RunnerUI and add the package to
   apps/ios/Runner.xcodeproj
+
+## 2026-11-12 - Run Ready screen, first pass
+
+- What it is: the signed-out SwiftUI landing screen, based on Figma's
+  01 Run - Ready frame, with first-run and sample-history Xcode previews.
+- How it was done: reused RunnerUI and the existing dawn photo, added
+  screen-local distance selection and a Start action seam, and opened
+  the screen directly from the app root.
+- Why this way: running has no account prerequisite, and the previews
+  can render both states without a database or network connection.
+- Importance: establishes the visual starting point of the run flow.
+- Gaps: workout start and other tabs need their destination flows.
+  Exact Figma comparison and accessibility verification are pending.
+
+## 2026-11-12 - Run Ready frame refinement
+
+- Selected Figma frame 5:3 and verified its 402 × 874 dimensions.
+  Matched the Start ring, four distance options, and last-run card more
+  closely. The history preview uses the reference greeting and date.
+- Added custom distance entry with locale-aware numeric validation.
+  The app still opens without authentication.
+- Rendered the history preview at standard size and AX 5. At accessibility
+  sizes the chips stack and the decorative, unwired tab strip is hidden.
+- Pixel-level comparison, custom distance interaction verification, and
+  wiring the workout and tab destinations remain open.
+
+## 2026-11-12 - Run Ready hero and distance input
+
+- Blended the hero image into the status-bar background and added press
+  feedback to the four distance chips.
+- Moved Custom distance into a native sheet with numeric validation and
+  Cancel and Set distance controls. Verified the sheet opens in the iPhone
+  simulator. Saving an entered value still needs runtime verification.
+- Rebuilt the app and rendered the updated history preview in Xcode.
+
+## 2026-11-12 - Run Ready distance verification
+
+- Matched the reference date order in the history preview and refined
+  spacing and typography around the distance options and tab strip.
+- On the iPhone 18 Pro simulator, entered and saved 7.5 km. The sheet
+  dismissed, Custom became selected, and Start displayed 7.5 km.
+- Xcode rendered the updated Ready preview. Exact pixel alignment with
+  Figma remains open.
+
+## 2026-11-12 - Ready card uses saved runs
+
+- Reads the most recent run from the shared local SwiftData store when
+  the scene becomes active. The card formats distance, elapsed time and
+  average pace from the saved measurements.
+- A missing distance leaves distance and pace unavailable. A storage
+  error reports that history is unavailable without opening another store.
+- Verified clean launch with an empty local store in the iPhone simulator.
+  The populated Xcode preview uses the same formatting with sample data.
+
+## 2026-11-12 - Last-run detail action
+
+- Added the View action from the Ready frame. It opens a native sheet
+  with the saved run's date, distance, elapsed time and average pace.
+- The action is available when a saved run exists. At accessibility text
+  sizes it moves below the metrics so its label can scale.
+- Verified that the action renders in the populated Xcode preview.
+
+## 2026-11-12 - Ready weather, custom distance, and navigation
+
+- Ready can show local Apple Weather with attribution after the runner
+  enables location access. WeatherKit must be enabled for the signed app ID.
+- Custom distance uses native wheels for 1–100 and km/mi, with a warm
+  gradient sheet and a Confirm action. The selected unit stays on the
+  Start label, and the start action receives kilometers.
+- Ready shows All caught up when there are no saved runs. The last-run
+  card uses lighter metrics. The Start ring now meets the outside edge.
+- The native tab bar groups Run and Goals with prominent PacePilot on
+  iOS 27. On iOS 26 all three use standard tabs. Community is at the top
+  and groups Places and community funding for their later screens.
+- Pulling beyond the bottom reveals View all, arms History with a
+  haptic, and opens the sheet on release. The entry is also tappable.
+  History uses local runs and supports Back and native sheet dismissal.
+- Verified the empty-state pull, Back, and custom wheel confirmation
+  on the iPhone 18 Pro simulator. Live WeatherKit requires a signed test.
+
+## 2026-11-12 - Ready tab palette correction
+
+- Kept Run and Goals together and PacePilot separate, with the original
+  dark surfaces, gold selection, and muted inactive items.
+- Uses branded controls over SwiftUI TabView selection so the palette and
+  placement are consistent on iOS 26 and iOS 27.
+
+## 2026-11-12 - Native Ready toolbar and tabs
+
+- Moved the branded Community pill into a native top toolbar item.
+- Restored the native SwiftUI tab bar and iOS 27 prominent PacePilot tab.
+  The bar requests the dark brand background and gold tint. On the tested
+  simulator, Liquid Glass resolves those surfaces to gray with white items.
+
+## 2026-11-12 - Ready header and tab refinement
+
+- Restored the inline date, weather, and Community layout and the dark,
+  gold, and muted tab palette after reviewing the system toolbar rendering.
+- Community uses a solid heart badge. PacePilot combines a running figure
+  and a sparkle and announces itself as an AI run coach to VoiceOver.
+
+## 2026-11-12 - Interactive Ready to History transition
+
+- Ready shows No activity yet in Instrument Serif when there are no runs.
+  The entry has no directional icon and remains available as a button.
+- The History page tracks the upward pull continuously. Crossing the
+  threshold requests haptic feedback and releasing settles the page with a
+  spring. Short pulls return to Ready. Back and a downward pull from the
+  History header dismiss it.
+- Ready scales and dims behind the moving page. With Reduce Motion on,
+  the page fades and Ready stays at its original scale.
+- When revising a referenced screen, preserve its approved components and
+  use only the cues explicitly requested for a new gesture.
+
+## 2026-11-12 - History entry simplified
+
+- Removed the custom slide, its gestures, and its haptic. The last-run
+  card has a View all action at the top right that pushes History through
+  the Run tab's NavigationStack. The empty state is static text.
+
+## 2026-11-13 - Branded startup and optional weather
+
+- Startup shows the RunnerUI wordmark while checking location permission.
+  An undecided permission opens the native iOS prompt directly.
+- Once allowed, location and Apple Weather have a five-second startup
+  deadline. Ready shows weather and attribution only after success.
+- The Runner target uses IjeIcon.icon as the installed app icon.
+- Verified on the simulator that the native prompt opens and Ready loads
+  without a weather row when Apple Weather is unavailable.
+
+## 2026-11-13 - SwiftUI shell and Ready organization
+
+- RootView renders RootNavigation and delegates startup and run history
+  to models created by AppViewModels. WeatherKit I/O lives in RunWeatherService.
+- Home owns tab selection through HomeTab. Run owns typed push and sheet
+  routes, and Ready composes separate hero, distance, and history views.
+- The debug Ready preview switches between demo, worst-case, and empty
+  fixtures. Large text exposed a squeezed weather label, so the fallback
+  header stacks at accessibility sizes. Metrics stack when the row does
+  not fit.
+- Verified simulator startup with live weather, rendered the worst-case
+  preview, and passed 24 iOS tests.
+
+## 2026-11-13 - Home page routing
+
+- AppRouting defines HomeNavigation and the typed Community and History
+  destinations. Root owns the router and Home renders its NavigationStack.
+- Both destinations are pushed pages with standard iOS Back navigation.
+  The distance picker remains local presentation state in Ready.
+
+## 2026-11-13 - Resolve weather before leaving splash
+
+- Splash resolves location first, then waits for WeatherKit to return
+  current conditions or an error before routing to Ready. The five-second
+  limit applies to finding a location, so a late fix no longer cuts the
+  WeatherKit request short.
+- Verified both the no-location fallback and live conditions with a
+  simulated Lagos location on the iPhone simulator.
+
+## 2026-11-13 - Run countdown
+
+- Start opens the Countdown page through the typed Home router. It counts
+  3–2–1 and hands the selected distance to the workout callback.
+- The Figma night palette, gold numeral, circle, and Get set heading use
+  RunnerUI tokens. The subtitle reports whether PacePilot is on or off.
+- PacePilot defaults to off until the app has an opt-in setting. The
+  workout screen remains a separate integration.
+
+## 2026-11-13 - Run Live screen
+
+- Countdown replaces its route with Live and preserves the selected distance.
+  Live uses the reference's dark metric layout, goal progress, and bottom controls.
+- The PacePilot card contains its on status and four sequentially pulsing dots.
+  Reduce Motion keeps the dots still.
+- The production route displays an elapsed timer and unavailable metrics until
+  sensor services are integrated. The Xcode preview uses the Figma sample values.
+
+## 2026-11-13 - Run Summary
+
+- Finishing Live replaces it with Summary through the Home router.
+  NavigationStack provides the Back button to Ready.
+- Summary uses the Figma photo and metric layout. The shared claim banner
+  shows ready or low community balance and hides at the signed expiry.
+- Both funded and low-balance states rendered in Xcode. Run sensor data,
+  claim issuance, and DAO balance are separate integrations.
+
+- Summary's achievement badge uses the filled bronze star from the Figma reference.
+
+## 2026-11-13 - PacePilot opt-in
+
+- The prominent PacePilot control presents the Figma opt-in content as
+  a full-screen cover. The toggle is the sole preference control and saves
+  immediately. A standard Close control dismisses the cover.
+- Countdown and Live use the saved preference. It defaults to off.
+
+## 2026-11-13 - Run History
+
+- History follows the Figma personal-best cards and month-grouped run
+  rows. The sand-circle Back button pops the existing Home stack.
+- The page reads the saved history already loaded for Ready. The 5K and
+  10K cards use matching recorded distances because split data is absent.
+- Verified the iPhone simulator build and populated Xcode preview.
+
+- History now uses the system inline title and Back button, matching Run Summary.
+
+- Ready's last-run card and each History row open the selected saved run
+  in Summary through the Home navigation stack. View all opens History.
+  Saved summaries use the recorded date, distance, and elapsed time.
+
+## 2026-11-13 - Splash handoff
+
+- Keep Home mounted behind the opaque splash so the native tab and
+  navigation containers can lay out before they become visible.
+- Three recorded iPhone simulator launches from a terminated process
+  showed Home fading in at full size without the top-left expansion.
