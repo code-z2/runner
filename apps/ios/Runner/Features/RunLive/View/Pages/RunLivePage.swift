@@ -109,7 +109,10 @@ struct RunLivePage: View {
           RunMetric(
             label: "Heart rate",
             value: model?.heartRate?.formatted(.number.precision(.fractionLength(0))), unit: "bpm")
-          RunMetric(label: "Runners crossed", value: previewDistance == nil ? "0" : "3")
+          RunMetric(
+            label: "Runners crossed",
+            value: previewDistance == nil
+              ? model?.runEncounters.map { ($0.new + $0.again).formatted() } : "3")
         }
 
         if pacePilotEnabled { PacePilotStatusCard() }

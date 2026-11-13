@@ -17,7 +17,8 @@ public actor RunStore {
   public func record(
     _ run: FinishedRunModel,
     distanceMeters: Double?,
-    cadenceStepsPerMinute: Int? = nil
+    cadenceStepsPerMinute: Int? = nil,
+    encounters: RunEncounterCounts? = nil
   ) throws -> RunRecordSnapshot {
     let runID = run.id
     let existing: [RunRecordModel]
@@ -42,6 +43,7 @@ public actor RunStore {
       batteryLevelAtStart: run.batteryLevelAtStart,
       batteryLevelAtEnd: run.batteryLevelAtEnd,
       cadenceStepsPerMinute: cadenceStepsPerMinute,
+      encounters: encounters,
       recordedAt: Date()
     )
     modelContext.insert(model)

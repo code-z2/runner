@@ -8,6 +8,7 @@ struct RunSummary: Identifiable, Hashable, Sendable {
   let elapsed: TimeInterval
   let date: Date
   var cadenceStepsPerMinute: Int? = nil
+  var encounters: RunEncounters? = nil
 }
 
 extension RunSummary {
@@ -16,6 +17,7 @@ extension RunSummary {
     self.init(
       id: record.id, distanceMeters: record.distanceMeters,
       elapsed: record.activeElapsed, date: record.startedAt,
-      cadenceStepsPerMinute: record.cadenceStepsPerMinute)
+      cadenceStepsPerMinute: record.cadenceStepsPerMinute,
+      encounters: record.encounters)
   }
 }

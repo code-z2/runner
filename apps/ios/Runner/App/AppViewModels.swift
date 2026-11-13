@@ -38,6 +38,10 @@ final class AppViewModels {
     canTrackLocation: { [app] in
       let status = app.permissions.location.status
       return status == .whenInUse || status == .always
+    },
+    encounters: app.runEncounters,
+    canTrackEncounters: { [app] in
+      app.permissions.bluetooth.status == .ready
     })
 
   lazy var run: RunViewModel = {

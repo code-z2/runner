@@ -8,6 +8,7 @@
 import Foundation
 import RunnerAuth
 import RunnerCadence
+import RunnerEncounters
 import RunnerGateway
 import RunnerHealthKit
 import RunnerLocation
@@ -46,6 +47,30 @@ final class AppModel {
 
   let runCadence = CadenceTracker(source: LiveCadenceUpdateSource())
 
+  /// Stable rotation root per install (per RotatingIdentifier's contract).
+  /// A random identifier, not a secret — UserDefaults is the right shelf.
+  private static var encounterRoot: UUID {
+    let key = "encounterRootIdentifier"
+    if let raw = UserDefaults.standard.string(forKey: key), let id = UUID(uuidString: raw) {
+      return id
+    }
+    let id = UUID()
+    UserDefaults.standard.set(id.uuidString, forKey: key)
+    return id
+  }
+
+  /// Shared encounter tracker. One instance per launch; per-run counts
+  /// come from snapshotting `counts` at start and diffing at finish, so
+  /// the ledger's long-lived visit history survives pause/resume cycles.
+  /// Created eagerly like the other trackers (Bluetooth managers, like
+  /// location managers, are created on the main thread at launch).
+  let runEncounters = EncounterTracker(
+    scanner: LiveProximityScanner(),
+    advertiser: LiveProximityAdvertiser(
+      rotation: RotatingIdentifier(root: encounterRoot)),
+    haptics: SystemHaptics(),
+    rotation: RotatingIdentifier(root: encounterRoot))
+
   let snapshots: FileSessionSnapshotStore
 
   /// Open the shared store on demand and surface provisioning failures to the UI.
@@ -59,7 +84,7 @@ final class AppModel {
   func loadRunHistory() async throws -> [RunSummary] {
     let store = try runStore.get()
     let records = try await store.recentRuns()
-    return records.map(RunSummary.init(record:))
+    return records.map { RunSummary(record: $0) }
   }
 
   init() {

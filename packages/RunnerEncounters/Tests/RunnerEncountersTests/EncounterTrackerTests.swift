@@ -69,6 +69,74 @@ struct EncounterTrackerTests {
   }
 
   @Test
+  func scannerStartFailureStopsAdvertising() async {
+    let advertiser = MockProximityAdvertiser()
+    let tracker = EncounterTracker(
+      scanner: FailingScanner(), advertiser: advertiser, haptics: MockEncounterHaptics(),
+      rotation: RotatingIdentifier(root: UUID()))
+
+    await #expect(throws: CocoaError.self) { try await tracker.start() }
+    #expect(advertiser.startedCount == 1)
+    #expect(advertiser.stoppedCount == 1)
+    #expect(await !tracker.isActive)
+  }
+
+  private struct FailingScanner: ProximityScanner {
+    func start(handler: @Sendable @escaping (ProximitySighting) -> Void) async throws {
+      throw CocoaError(.featureUnsupported)
+    }
+
+    func stop() async {}
+  }
+
+  @Test
+  func stopWhileScannerStartsLeavesTrackingStopped() async throws {
+    let scanner = SuspendedScanner()
+    let advertiser = MockProximityAdvertiser()
+    let tracker = EncounterTracker(
+      scanner: scanner, advertiser: advertiser, haptics: MockEncounterHaptics(),
+      rotation: RotatingIdentifier(root: UUID()))
+
+    let start = Task { try await tracker.start() }
+    await scanner.waitForStart()
+    await #expect(throws: EncounterError.alreadyActive) { try await tracker.start() }
+    let stop = Task { await tracker.stop() }
+    await scanner.completeStart()
+    try await start.value
+    await stop.value
+
+    #expect(await !tracker.isActive)
+    #expect(await scanner.stops == 1)
+    #expect(advertiser.stoppedCount == 1)
+  }
+
+  private actor SuspendedScanner: ProximityScanner {
+    private var startContinuation: CheckedContinuation<Void, Never>?
+    private var observer: CheckedContinuation<Void, Never>?
+    private(set) var stops = 0
+
+    func start(handler: @Sendable @escaping (ProximitySighting) -> Void) async throws {
+      await withCheckedContinuation {
+        startContinuation = $0
+        observer?.resume()
+        observer = nil
+      }
+    }
+
+    func waitForStart() async {
+      guard startContinuation == nil else { return }
+      await withCheckedContinuation { observer = $0 }
+    }
+
+    func completeStart() {
+      startContinuation?.resume()
+      startContinuation = nil
+    }
+
+    func stop() async { stops += 1 }
+  }
+
+  @Test
   func doubleStartThrowsAlreadyActive() async throws {
     let box = NowBox()
     let tracker = tracker(scanner: MockProximityScanner(sightings: []), box: box)
@@ -78,6 +146,7 @@ struct EncounterTrackerTests {
     await #expect(throws: EncounterError.alreadyActive) {
       try await tracker.start()
     }
+    await tracker.stop()
   }
 
   @Test

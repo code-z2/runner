@@ -4,6 +4,7 @@ import Foundation
 import OSLog
 import Observation
 import RunnerCadence
+import RunnerEncounters
 import RunnerHealthKit
 import RunnerLocation
 import RunnerSession
@@ -35,6 +36,10 @@ final class RunLiveViewModel: AppViewModelType {
   private let cadence: CadenceTracker
   private let healthKit: any HealthKitGateway
   private let canTrackLocation: @MainActor () -> Bool
+  private let encounters: EncounterTracker?
+  private let canTrackEncounters: @MainActor () -> Bool
+  private var encounterBaseline: EncounterCounts?
+  private(set) var runEncounters: RunEncounters?
   private var session: WorkoutSession?
   private static let healthExportKey = "run.appleHealthExport"
   private let preferences: UserDefaults
@@ -59,7 +64,9 @@ final class RunLiveViewModel: AppViewModelType {
     cadence: CadenceTracker,
     healthKit: any HealthKitGateway,
     preferences: UserDefaults = .standard,
-    canTrackLocation: @escaping @MainActor () -> Bool
+    canTrackLocation: @escaping @MainActor () -> Bool,
+    encounters: EncounterTracker? = nil,
+    canTrackEncounters: @escaping @MainActor () -> Bool = { true }
   ) {
     self.snapshots = snapshots
     self.store = store
@@ -70,6 +77,8 @@ final class RunLiveViewModel: AppViewModelType {
     self.preferences = preferences
     healthExportEnabled = preferences.bool(forKey: Self.healthExportKey)
     self.canTrackLocation = canTrackLocation
+    self.encounters = encounters
+    self.canTrackEncounters = canTrackEncounters
   }
 
   var hasSession: Bool { session != nil || isUpdating }
@@ -117,6 +126,8 @@ final class RunLiveViewModel: AppViewModelType {
           "Could not start Live Activity: \(error.localizedDescription, privacy: .private)")
       }
     }
+    encounterBaseline = nil
+    runEncounters = nil
     await startSensors()
     checkpointTask = Task { [weak self] in
       while !Task.isCancelled {
@@ -173,7 +184,8 @@ final class RunLiveViewModel: AppViewModelType {
     activityID = nil
     await stopSensors()
     let record = try await store().record(
-      finished, distanceMeters: distanceMeters, cadenceStepsPerMinute: lastMeasuredCadence)
+      finished, distanceMeters: distanceMeters, cadenceStepsPerMinute: lastMeasuredCadence,
+      encounters: runEncounters)
     try snapshots.clear()
     self.session = nil
     healthExportFailed = false
@@ -216,6 +228,12 @@ final class RunLiveViewModel: AppViewModelType {
       try await session.checkpoint(distanceMeters: distanceMeters)
       let value = await session.activeElapsed
       if !isUpdating, self.session === session, state == .active {
+        if encounterBaseline == nil {
+          await startEncountersIfAvailable()
+        } else {
+          await refreshEncounterCounts()
+        }
+        guard !isUpdating, self.session === session, state == .active else { return }
         await updateActivity(elapsed: value, onlyIfDistanceChanged: true)
       }
     } catch {
@@ -282,6 +300,7 @@ final class RunLiveViewModel: AppViewModelType {
         }
       }
     }
+    await startEncountersIfAvailable()
     if let events = try? await cadence.start() {
       cadenceTask = Task { [weak self] in
         for await event in events {
@@ -324,6 +343,30 @@ final class RunLiveViewModel: AppViewModelType {
     heartRate = nil
     await location.stop()
     await cadence.stop()
+    await encounters?.stop()
+    await refreshEncounterCounts()
+  }
+
+  private func startEncountersIfAvailable() async {
+    guard canTrackEncounters(), let encounters else { return }
+    let baseline = await encounters.counts
+    do {
+      try await encounters.start()
+      if encounterBaseline == nil { encounterBaseline = baseline }
+      await refreshEncounterCounts()
+    } catch {
+      Self.logger.error(
+        "Could not start encounter tracking: \(error.localizedDescription, privacy: .private)")
+    }
+  }
+
+  private func refreshEncounterCounts() async {
+    guard let encounters, let baseline = encounterBaseline else { return }
+    let counts = await encounters.counts
+    runEncounters = RunEncounters(
+      new: counts.first - baseline.first,
+      again: counts.repeat - baseline.repeat,
+      together: counts.dwell - baseline.dwell)
   }
 
   private func receiveLocation(_ event: LocationEvent, since startedAt: Date) {
@@ -358,7 +401,7 @@ final class RunLiveViewModel: AppViewModelType {
     case .locationUnavailable, .authorizationDenied, .authorizationRestricted,
       .serviceSessionRequired:
       previousLocation = nil
-      pace = nil
+        pace = nil
     }
   }
 

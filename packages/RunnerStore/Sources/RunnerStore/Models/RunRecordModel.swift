@@ -31,6 +31,12 @@ public final class RunRecordModel {
 
   public var cadenceStepsPerMinute: Int?
 
+  public var newEncounters: Int?
+
+  public var repeatEncounters: Int?
+
+  public var togetherEncounters: Int?
+
   public init(
     runID: UUID,
     startedAt: Date,
@@ -40,6 +46,7 @@ public final class RunRecordModel {
     batteryLevelAtStart: Float?,
     batteryLevelAtEnd: Float?,
     cadenceStepsPerMinute: Int? = nil,
+    encounters: RunEncounterCounts? = nil,
     recordedAt: Date
   ) {
     self.runID = runID
@@ -50,6 +57,9 @@ public final class RunRecordModel {
     self.batteryLevelAtStart = batteryLevelAtStart
     self.batteryLevelAtEnd = batteryLevelAtEnd
     self.cadenceStepsPerMinute = cadenceStepsPerMinute
+    newEncounters = encounters?.new
+    repeatEncounters = encounters?.again
+    togetherEncounters = encounters?.together
     self.recordedAt = recordedAt
   }
 }

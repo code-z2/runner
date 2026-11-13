@@ -9,6 +9,8 @@ import CoreLocation
 import Foundation
 import RunnerCadence
 import RunnerCadenceTesting
+import RunnerEncounters
+import RunnerEncountersTesting
 import RunnerHealthKit
 import RunnerLocation
 import RunnerSession
@@ -61,6 +63,33 @@ struct RunRecoveryTests {
     let summary = try await live.finish()
     #expect(summary?.cadenceStepsPerMinute == 158)
     #expect(try await store.recentRuns().first?.cadenceStepsPerMinute == 158)
+  }
+
+  @MainActor
+  @Test
+  func liveEncounterCountsSurviveFinishingAndReloadingHistory() async throws {
+    let store = RunStore(modelContainer: try AppDatabase.ephemeral().container)
+    let scanner = MockProximityScanner(sightings: [
+      ProximitySighting(
+        peer: EncounterPeer(peripheralID: UUID(), broadcastID: nil), rssi: -55, at: .now)
+    ])
+    let tracker = EncounterTracker(
+      scanner: scanner, advertiser: MockProximityAdvertiser(), haptics: MockEncounterHaptics(),
+      rotation: RotatingIdentifier(root: UUID()))
+    let live = RunLiveViewModel(
+      snapshots: InMemorySessionSnapshotStore(), store: { store },
+      location: LocationTracker(source: TestLocationFeed()),
+      cadence: CadenceTracker(source: LiveCadenceUpdateSource(availabilityChecker: { false })),
+      healthKit: LiveHealthKitStore(), canTrackLocation: { false }, encounters: tracker)
+
+    try await live.start()
+    try await live.togglePause()
+    #expect(live.runEncounters?.new == 1)
+    try await live.togglePause()
+    let summary = try #require(try await live.finish())
+    #expect(summary.encounters == RunEncounters(new: 1, again: 0, together: 0))
+    let saved = try #require(try await store.recentRuns().first)
+    #expect(RunSummary(record: saved).encounters == summary.encounters)
   }
 
   @MainActor
@@ -150,7 +179,7 @@ struct RunRecoveryTests {
     #expect(try drafts.load() == nil)
     let reopened = RunStore(modelContainer: try AppDatabase.persistent(in: directory).container)
     let saved = try await reopened.recentRuns()
-    #expect(saved.map(RunSummary.init(record:)) == [finished])
+    #expect(saved.map { RunSummary(record: $0) } == [finished])
 
     let interrupted = snapshot(state: .active)
     try drafts.save(interrupted)

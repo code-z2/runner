@@ -92,6 +92,20 @@ struct EncounterLedgerTests {
   }
 
   @Test
+  func pausedTimeDoesNotCountTowardDwell() {
+    let clock = TestClock()
+    var ledger = EncounterLedger(now: { clock.now })
+    let peer = UUID()
+    _ = ledger.record(sighting(peer: peer, clock: clock))
+    ledger.endSegment()
+
+    clock.advance(by: 90)
+    #expect(ledger.record(sighting(peer: peer, clock: clock)) == [])
+    clock.advance(by: 61)
+    #expect(ledger.record(sighting(peer: peer, clock: clock)) == [.dwellReached])
+  }
+
+  @Test
   func newVisitResetsDwell() {
     let clock = TestClock()
     var ledger = EncounterLedger(now: { clock.now })

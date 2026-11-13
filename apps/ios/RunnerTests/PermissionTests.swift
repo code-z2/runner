@@ -7,12 +7,33 @@
 
 import CoreBluetooth
 import CoreLocation
+import Foundation
 import HealthKit
+import RunnerEncounters
+import RunnerEncountersTesting
 import Testing
 
 @testable import Runner
 
 struct PermissionTests {
+
+  #if !targetEnvironment(simulator)
+    @MainActor
+    @Test
+    func encounterTrackingStartsWithLiveBluetoothManagers() async throws {
+      let id = UUID()
+      let rotation = RotatingIdentifier(root: id)
+      let tracker = EncounterTracker(
+        scanner: LiveProximityScanner(restoreIdentifier: "runner.test.central.\(id)"),
+        advertiser: LiveProximityAdvertiser(
+          rotation: rotation, restoreIdentifier: "runner.test.peripheral.\(id)"),
+        haptics: MockEncounterHaptics(), rotation: rotation)
+
+      try await tracker.start()
+      #expect(await tracker.isActive)
+      await tracker.stop()
+    }
+  #endif
 
   @Test
   func locationMapping() {

@@ -65,6 +65,7 @@ struct HomeView: View {
                 elapsed: savedRun.elapsed, date: savedRun.date,
                 distanceKilometers: RunHistoryMetrics.kilometers(savedRun.distanceMeters),
                 cadence: savedRun.cadenceStepsPerMinute,
+                encounters: savedRun.encounters,
                 healthConnection: live, showsLatestHealthExport: destination == .summary(savedRun))
             case .history:
               RunHistoryPage(runs: run.runs, unavailable: run.historyUnavailable)

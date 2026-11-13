@@ -31,7 +31,15 @@ public actor EncounterTracker {
 
   private var grader = RssiGrader()
 
-  private var active = false
+  private enum Phase {
+    case idle
+    case starting
+    case active
+    case stopping
+  }
+
+  private var phase = Phase.idle
+  private var transition: Task<Void, any Error>?
 
   private var advertisedWindow: Int?
 
@@ -39,6 +47,9 @@ public actor EncounterTracker {
 
   private var pump: Task<Void, Never>?
 
+  /// Synchronous actor initializers run before the actor's identity is
+  /// established, so composition roots can call this from stored
+  /// properties. Safe: the body only assigns stored properties.
   public init(
     scanner: some ProximityScanner,
     advertiser: some ProximityAdvertiser,
@@ -59,13 +70,21 @@ public actor EncounterTracker {
   }
 
   public var isActive: Bool {
-    active
+    phase == .active
   }
 
   public func start() async throws {
-    guard !active else {
+    guard phase == .idle else {
       throw EncounterError.alreadyActive
     }
+    phase = .starting
+    let startup = Task { try await startTracking() }
+    transition = startup
+    try await startup.value
+  }
+
+  private func startTracking() async throws {
+    defer { transition = nil }
     let (stream, continuation) = AsyncStream.makeStream(of: ProximitySighting.self)
     do {
       try await advertiser.start()
@@ -73,31 +92,50 @@ public actor EncounterTracker {
       try await scanner.start { continuation.yield($0) }
     } catch {
       continuation.finish()
+      advertisedWindow = nil
+      await scanner.stop()
+      await advertiser.stop()
+      phase = .idle
       throw error
     }
-    active = true
+    phase = .active
     self.continuation = continuation
     pump = Task.detached { [weak self] in
-      guard let self else {
-        return
-      }
       for await sighting in stream {
+        guard let self else { return }
         await self.handle(sighting)
       }
     }
   }
 
   public func stop() async {
+    if phase == .starting {
+      _ = try? await transition?.value
+    }
+    if phase == .stopping {
+      _ = try? await transition?.value
+      return
+    }
+    guard phase == .active else { return }
+    phase = .stopping
+    let shutdown = Task<Void, any Error> { await stopTracking() }
+    transition = shutdown
+    _ = try? await shutdown.value
+  }
+
+  private func stopTracking() async {
     continuation?.finish()
     continuation = nil
     if let pump {
       await pump.value
       self.pump = nil
     }
-    active = false
+    ledger.endSegment()
     advertisedWindow = nil
     await scanner.stop()
     await advertiser.stop()
+    phase = .idle
+    transition = nil
   }
 
   private func handle(_ sighting: ProximitySighting) async {

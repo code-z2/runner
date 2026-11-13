@@ -30,6 +30,9 @@
       "path": "../../packages/RunnerCadence",
     }, {
       "kind": "local",
+      "path": "../../packages/RunnerEncounters",
+    }, {
+      "kind": "local",
       "path": "../../packages/RunnerSession",
     }, {
       "kind": "local",
@@ -276,6 +279,10 @@
           "product-name": "RunnerCadence",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "RunnerEncounters",
+          "product-name": "RunnerEncounters",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "RunnerGateway",
           "product-name": "RunnerGateway",
           "build-phase": { "build-phase": "frameworks" },
@@ -417,6 +424,14 @@
           "product-name": "RunnerCadenceTesting",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "RunnerEncounters",
+          "product-name": "RunnerEncounters",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerEncounters",
+          "product-name": "RunnerEncountersTesting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "RunnerGateway",
           "product-name": "RunnerGateway",
           "build-phase": { "build-phase": "frameworks" },
@@ -460,13 +475,13 @@
       ],
       "build-settings": {
         "BUNDLE_LOADER": "$(TEST_HOST)",
+        "CLANG_ENABLE_OBJC_WEAK": "YES",
         "CODE_SIGN_ENTITLEMENTS": "",
         "DEVELOPMENT_TEAM": "QHUBYNZ482",
-        "CLANG_ENABLE_OBJC_WEAK": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
-        "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @loader_path/Frameworks @executable_path/Frameworks",
         "INFOPLIST_KEY_CFBundleDisplayName": "RunnerTests",
         "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @loader_path/Frameworks @executable_path/Frameworks",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.wades.ije.tests",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "SDKROOT": "iphoneos",

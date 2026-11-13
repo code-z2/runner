@@ -14,7 +14,7 @@ import SwiftData
 public enum TestStoreFactory {
 
   public static func makeStore() throws -> RunStore {
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try ModelContainer(
       for: schema,

@@ -51,7 +51,7 @@ struct RunStoreTests {
           batteryLevelAtStart: nil, batteryLevelAtEnd: nil, recordedAt: .now))
       try context.save()
     }
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
     let container = try ModelContainer(
       for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
     let store = RunStore(modelContainer: container)
@@ -60,9 +60,42 @@ struct RunStoreTests {
     #expect(existing.first?.distanceMeters == distance)
     #expect(existing.first?.cadenceStepsPerMinute == nil)
     let (newRun, newDistance) = finishedRun()
-    _ = try await store.record(newRun, distanceMeters: newDistance, cadenceStepsPerMinute: 158)
+    let encounters = RunEncounterCounts(new: 3, again: 1, together: 1)
+    _ = try await store.record(
+      newRun, distanceMeters: newDistance, cadenceStepsPerMinute: 158, encounters: encounters)
     let saved = try await store.recentRuns()
     #expect(saved.first { $0.id == newRun.id }?.cadenceStepsPerMinute == 158)
+    #expect(saved.first { $0.id == newRun.id }?.encounters == encounters)
+    #expect(saved.first { $0.id == oldRun.id }?.encounters == nil)
+  }
+
+  @Test
+  func versionTwoHistoryKeepsCadenceWhenEncounterFieldsAreAdded() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let configuration = ModelConfiguration(url: directory.appending(path: "runner.store"))
+    let (run, distance) = finishedRun()
+    do {
+      let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
+      let container = try ModelContainer(for: schema, configurations: [configuration])
+      let context = ModelContext(container)
+      context.insert(
+        RunnerStoreSchemaV2.RunRecordModel(
+          runID: run.id, startedAt: run.startedAtWall, activeElapsed: run.activeElapsed,
+          distanceMeters: distance, finishReasonRaw: "userFinished",
+          batteryLevelAtStart: nil, batteryLevelAtEnd: nil, cadenceStepsPerMinute: 158,
+          recordedAt: .now))
+      try context.save()
+    }
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
+    let container = try ModelContainer(
+      for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
+    let store = RunStore(modelContainer: container)
+    let saved = try #require(try await store.recentRuns().first)
+    #expect(saved.id == run.id)
+    #expect(saved.cadenceStepsPerMinute == 158)
+    #expect(saved.encounters == nil)
   }
 
   @Test

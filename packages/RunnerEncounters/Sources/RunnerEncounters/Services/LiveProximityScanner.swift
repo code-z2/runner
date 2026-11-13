@@ -8,75 +8,72 @@
 #if canImport(CoreBluetooth)
   import CoreBluetooth
   import Foundation
-  import Synchronization
 
-  /// Live BLE scanner: explicit service-UUID scan with state preservation,
-  /// so a killed app relaunches on discovery. Background scans coalesce by
-  /// OS design; rotation windows are wider than that coalescing.
+  /// Live BLE scanner for active runs. Background scans coalesce by OS design.
   ///
-  /// `Mutex` guards the handler because CoreBluetooth invokes the delegate on
-  /// its own queue while start/stop arrive from the tracker's executor.
-  /// CoreBluetooth's own types are not marked `Sendable`; all cross-thread
-  /// state goes through the mutex, so `@unchecked Sendable` is sound here.
-  public final class LiveProximityScanner: NSObject, ProximityScanner, @unchecked Sendable {
+  /// Manager lifecycle and delegate callbacks share the main actor.
+  @MainActor
+  public final class LiveProximityScanner: NSObject, ProximityScanner {
 
-    private struct ScanState: Sendable {
-      var handler: (@Sendable (ProximitySighting) -> Void)?
-      var started: Bool
-    }
+    private let serviceUUID: UUID
 
-    private let serviceUUID: CBUUID
+    private let restoreIdentifier: String
 
-    private let central: CBCentralManager
+    /// Created on first start, not in init: building a CBCentralManager at
+    /// app boot crashes test hosts. Mirrors LiveLocationUpdateSource, whose
+    /// hardware comes up in start().
+    private var central: CBCentralManager?
 
-    private let state = Mutex(ScanState(handler: nil, started: false))
+    private var handler: (@Sendable (ProximitySighting) -> Void)?
 
-    public init(
+    public nonisolated init(
       serviceUUID: UUID = EncounterService.uuid,
       restoreIdentifier: String = "com.runner.encounters.central"
     ) {
-      self.serviceUUID = CBUUID(nsuuid: serviceUUID)
-      central = CBCentralManager(
-        delegate: nil,
-        queue: nil,
-        options: [CBCentralManagerOptionRestoreIdentifierKey: restoreIdentifier]
-      )
+      self.serviceUUID = serviceUUID
+      self.restoreIdentifier = restoreIdentifier
       super.init()
-      central.delegate = self
     }
 
     public func start(handler: @Sendable @escaping (ProximitySighting) -> Void) async throws {
-      state.withLock {
-        $0.handler = handler
-        $0.started = true
-      }
-      if central.state == .poweredOn {
-        scan()
+      self.handler = handler
+      let manager = ensureCentral()
+      if manager.state == .poweredOn {
+        scan(using: manager)
       }
     }
 
     public func stop() async {
-      state.withLock {
-        $0.handler = nil
-        $0.started = false
-      }
-      central.stopScan()
+      handler = nil
+      central?.stopScan()
     }
 
-    private func scan() {
+    private func ensureCentral() -> CBCentralManager {
+      if let central {
+        return central
+      }
+      let manager = CBCentralManager(
+        delegate: self,
+        queue: nil,
+        options: [CBCentralManagerOptionRestoreIdentifierKey: restoreIdentifier]
+      )
+      central = manager
+      return manager
+    }
+
+    private func scan(using central: CBCentralManager) {
       central.scanForPeripherals(
-        withServices: [serviceUUID],
+        withServices: [CBUUID(nsuuid: serviceUUID)],
         options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
       )
     }
   }
 
-  extension LiveProximityScanner: CBCentralManagerDelegate {
+  extension LiveProximityScanner: @preconcurrency CBCentralManagerDelegate {
 
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-      let started = state.withLock { $0.started }
-      if central.state == .poweredOn, started {
-        scan()
+      if central.state == .poweredOn, handler != nil {
+        scan(using: central)
       }
     }
 
@@ -84,9 +81,8 @@
       _ central: CBCentralManager,
       willRestoreState dict: [String: Any]
     ) {
-      let started = state.withLock { $0.started }
-      if started {
-        scan()
+      if handler != nil, central.state == .poweredOn {
+        scan(using: central)
       }
     }
 
@@ -96,7 +92,6 @@
       advertisementData: [String: Any],
       rssi: NSNumber
     ) {
-      let handler = state.withLock { $0.handler }
       guard let handler else {
         return
       }

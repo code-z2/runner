@@ -8,77 +8,85 @@
 #if canImport(CoreBluetooth)
   import CoreBluetooth
   import Foundation
-  import Synchronization
 
   /// Live BLE advertiser: service UUID plus the current rotating ID as the
   /// local name in the foreground; UUID-only in the background, where iOS
   /// truncates the packet. Identity refresh re-advertises under the new window.
   ///
-  /// `Mutex` guards the lifecycle flags for the same reason as the scanner:
-  //  delegate callbacks arrive on CoreBluetooth's queue. CoreBluetooth's own
-  //  types are not marked `Sendable`; all cross-thread state goes through the
-  //  mutex, so `@unchecked Sendable` is sound here.
-  public final class LiveProximityAdvertiser: NSObject, ProximityAdvertiser, @unchecked Sendable {
+  /// Manager lifecycle and delegate callbacks share the main actor.
+  @MainActor
+  public final class LiveProximityAdvertiser: NSObject, ProximityAdvertiser {
 
-    private let serviceUUID: CBUUID
+    private let serviceUUID: UUID
 
     private let rotation: RotatingIdentifier
 
-    private let peripheral: CBPeripheralManager
+    private let restoreIdentifier: String
 
-    private let active = Mutex(false)
+    /// Created on first start, not in init: building a CBPeripheralManager
+    /// at app boot crashes test hosts. Mirrors the scanner above.
+    private var peripheral: CBPeripheralManager?
 
-    public init(
+    private var active = false
+
+    public nonisolated init(
       serviceUUID: UUID = EncounterService.uuid,
       rotation: RotatingIdentifier,
       restoreIdentifier: String = "com.runner.encounters.peripheral"
     ) {
-      self.serviceUUID = CBUUID(nsuuid: serviceUUID)
+      self.serviceUUID = serviceUUID
       self.rotation = rotation
-      peripheral = CBPeripheralManager(
-        delegate: nil,
-        queue: nil,
-        options: [CBPeripheralManagerOptionRestoreIdentifierKey: restoreIdentifier]
-      )
+      self.restoreIdentifier = restoreIdentifier
       super.init()
-      peripheral.delegate = self
     }
 
     public func start() async throws {
-      active.withLock { $0 = true }
-      if peripheral.state == .poweredOn {
-        advertise()
+      active = true
+      let manager = ensurePeripheral()
+      if manager.state == .poweredOn {
+        advertise(using: manager)
       }
     }
 
     public func stop() async {
-      active.withLock { $0 = false }
-      peripheral.stopAdvertising()
+      active = false
+      peripheral?.stopAdvertising()
     }
 
     public func refreshIdentity() async {
-      let advertising = active.withLock { $0 }
-      guard advertising, peripheral.state == .poweredOn else {
+      guard active, let peripheral, peripheral.state == .poweredOn else {
         return
       }
       peripheral.stopAdvertising()
-      advertise()
+      advertise(using: peripheral)
     }
 
-    private func advertise() {
+    private func ensurePeripheral() -> CBPeripheralManager {
+      if let peripheral {
+        return peripheral
+      }
+      let manager = CBPeripheralManager(
+        delegate: self,
+        queue: nil,
+        options: [CBPeripheralManagerOptionRestoreIdentifierKey: restoreIdentifier]
+      )
+      peripheral = manager
+      return manager
+    }
+
+    private func advertise(using peripheral: CBPeripheralManager) {
       peripheral.startAdvertising([
-        CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
+        CBAdvertisementDataServiceUUIDsKey: [CBUUID(nsuuid: serviceUUID)],
         CBAdvertisementDataLocalNameKey: rotation.id(for: Date()),
       ])
     }
   }
 
-  extension LiveProximityAdvertiser: CBPeripheralManagerDelegate {
+  extension LiveProximityAdvertiser: @preconcurrency CBPeripheralManagerDelegate {
 
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-      let advertising = active.withLock { $0 }
-      if peripheral.state == .poweredOn, advertising {
-        advertise()
+      if peripheral.state == .poweredOn, active {
+        advertise(using: peripheral)
       }
     }
 
@@ -86,9 +94,8 @@
       _ peripheral: CBPeripheralManager,
       willRestoreState dict: [String: Any]
     ) {
-      let advertising = active.withLock { $0 }
-      if advertising {
-        advertise()
+      if active, peripheral.state == .poweredOn {
+        advertise(using: peripheral)
       }
     }
   }

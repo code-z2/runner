@@ -20,7 +20,7 @@ public struct EncounterLedger {
   public static let retention: TimeInterval = 30 * 24 * 3_600
 
   private struct Visit {
-    var firstSeen: Date
+    var firstSeen: Date?
     var lastSeen: Date
     var dwellFired: Bool
   }
@@ -57,14 +57,23 @@ public struct EncounterLedger {
       repeatCount += 1
       return [.countedRepeat]
     }
+    if visit.firstSeen == nil { visit.firstSeen = sighting.at }
     visit.lastSeen = sighting.at
     visits[id] = visit
-    if !visit.dwellFired, sighting.at.timeIntervalSince(visit.firstSeen) >= Self.dwellThreshold {
+    if !visit.dwellFired, let firstSeen = visit.firstSeen,
+      sighting.at.timeIntervalSince(firstSeen) >= Self.dwellThreshold
+    {
       visits[id]?.dwellFired = true
       dwellCount += 1
       return [.dwellReached]
     }
     return []
+  }
+
+  mutating func endSegment() {
+    for id in visits.keys {
+      visits[id]?.firstSeen = nil
+    }
   }
 
   private mutating func prune() {

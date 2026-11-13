@@ -89,9 +89,9 @@ struct RunSummaryPage: View {
           Text("Runners crossed").runnerText(.eyebrow)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
           layout {
-            RunMetric(label: "New", value: (encounters?.new ?? 0).formatted())
-            RunMetric(label: "Again", value: (encounters?.again ?? 0).formatted())
-            RunMetric(label: "Ran together", value: (encounters?.together ?? 0).formatted())
+            RunMetric(label: "New", value: encounters?.new.formatted())
+            RunMetric(label: "Again", value: encounters?.again.formatted())
+            RunMetric(label: "Ran together", value: encounters?.together.formatted())
           }
         }
         .padding(Theme.Spacing.md)
