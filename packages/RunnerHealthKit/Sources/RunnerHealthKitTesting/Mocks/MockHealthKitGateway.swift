@@ -24,6 +24,8 @@ public final class MockHealthKitGateway: HealthKitGateway, @unchecked Sendable {
     self.heartRateSamples = heartRateSamples
   }
 
+  public var canSaveWorkouts: Bool { authorized }
+
   public func requestAccess() async throws {
     guard authorized else {
       throw HealthKitError.notAuthorized

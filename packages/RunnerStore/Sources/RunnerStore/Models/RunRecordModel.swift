@@ -29,6 +29,8 @@ public final class RunRecordModel {
 
   public var recordedAt: Date
 
+  public var cadenceStepsPerMinute: Int?
+
   public init(
     runID: UUID,
     startedAt: Date,
@@ -37,6 +39,7 @@ public final class RunRecordModel {
     finishReasonRaw: String,
     batteryLevelAtStart: Float?,
     batteryLevelAtEnd: Float?,
+    cadenceStepsPerMinute: Int? = nil,
     recordedAt: Date
   ) {
     self.runID = runID
@@ -46,6 +49,7 @@ public final class RunRecordModel {
     self.finishReasonRaw = finishReasonRaw
     self.batteryLevelAtStart = batteryLevelAtStart
     self.batteryLevelAtEnd = batteryLevelAtEnd
+    self.cadenceStepsPerMinute = cadenceStepsPerMinute
     self.recordedAt = recordedAt
   }
 }

@@ -13,43 +13,50 @@ import CoreLocation
 /// All mutation happens on the tracker's call path: `start` then `stop`,
 /// never concurrently. No shared state is touched from two threads, which is
 /// why `@unchecked Sendable` is sound here rather than a lock.
-@available(macOS, unavailable, message: "Live updates need a service session, which macOS does not offer.")
+@available(
+  macOS, unavailable, message: "Live updates need a service session, which macOS does not offer."
+)
 public final class LiveLocationUpdateSource: LocationUpdateSource, @unchecked Sendable {
 
-    private var session: CLServiceSession?
+  private var session: CLServiceSession?
 
-    private var pump: Task<Void, Never>?
+  private var backgroundActivity: CLBackgroundActivitySession?
 
-    public init() {}
+  private var pump: Task<Void, Never>?
 
-    public func start(handler: @Sendable @escaping (LocationEvent) -> Void) async {
-        guard pump == nil else {
-            return
-        }
-        session = CLServiceSession(authorization: .whenInUse)
-        pump = Task {
-            do {
-                for try await update in CLLocationUpdate.liveUpdates(
-                    CLLocationUpdate.LiveConfiguration.fitness
-                ) {
-                    try Task.checkCancellation()
-                    let events = LocationEventMapper.events(
-                        location: update.location,
-                        flags: LocationUpdateFlags(update: update)
-                    )
-                    for event in events {
-                        handler(event)
-                    }
-                }
-            } catch {
-                return
-            }
-        }
+  public init() {}
+
+  public func start(handler: @Sendable @escaping (LocationEvent) -> Void) async {
+    guard pump == nil else {
+      return
     }
-
-    public func stop() async {
-        pump?.cancel()
-        pump = nil
-        session = nil
+    backgroundActivity = CLBackgroundActivitySession()
+    session = CLServiceSession(authorization: .whenInUse)
+    pump = Task {
+      do {
+        for try await update in CLLocationUpdate.liveUpdates(
+          CLLocationUpdate.LiveConfiguration.fitness
+        ) {
+          try Task.checkCancellation()
+          let events = LocationEventMapper.events(
+            location: update.location,
+            flags: LocationUpdateFlags(update: update)
+          )
+          for event in events {
+            handler(event)
+          }
+        }
+      } catch {
+        return
+      }
     }
+  }
+
+  public func stop() async {
+    pump?.cancel()
+    pump = nil
+    session = nil
+    backgroundActivity?.invalidate()
+    backgroundActivity = nil
+  }
 }

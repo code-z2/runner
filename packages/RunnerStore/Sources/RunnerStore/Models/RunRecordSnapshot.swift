@@ -24,7 +24,10 @@ public struct RunRecordSnapshot: Sendable, Equatable {
 
   public let batteryLevelAtEnd: Float?
 
+  public let cadenceStepsPerMinute: Int?
+
   init(model: RunRecordModel) {
+    cadenceStepsPerMinute = model.cadenceStepsPerMinute
     id = model.runID
     startedAt = model.startedAt
     activeElapsed = model.activeElapsed

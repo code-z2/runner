@@ -4,6 +4,8 @@ import SwiftUI
 struct RunLiveControls: View {
 
   let paused: Bool
+  let canPause: Bool
+  let canFinish: Bool
   let togglePause: () -> Void
   let finish: () -> Void
 
@@ -26,6 +28,7 @@ struct RunLiveControls: View {
           .frame(width: Theme.Sizing.buttonHeight, height: Theme.Sizing.buttonHeight)
           .background(Theme.Colors.surfaceRaised, in: Circle())
       }
+      .disabled(!canPause)
       .accessibilityLabel(paused ? "Resume run" : "Pause run")
       .sensoryFeedback(.impact(weight: .medium), trigger: paused)
 
@@ -64,6 +67,7 @@ struct RunLiveControls: View {
         .accessibilityLabel("Finish run")
       }
       .frame(height: Theme.Sizing.buttonHeight)
+      .disabled(!canFinish)
     }
     .buttonStyle(.plain)
     .confirmationDialog(

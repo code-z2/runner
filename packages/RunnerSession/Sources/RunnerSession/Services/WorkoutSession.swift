@@ -16,6 +16,7 @@ import Foundation
 public actor WorkoutSession {
 
   private let clock: @Sendable () -> TimeInterval
+  private let wallClock: @Sendable () -> Date
 
   private let batteryLevel: @Sendable () -> Float?
 
@@ -34,13 +35,17 @@ public actor WorkoutSession {
   private var batteryLevelAtStart: Float?
 
   private var finishedRecord: FinishedRunModel?
+  private var pausedAt: Date?
+  private var pauses: [DateInterval] = []
 
   public init(
     clock: @Sendable @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+    wallClock: @Sendable @escaping () -> Date = { Date() },
     batteryLevel: @Sendable @escaping () -> Float? = { nil },
     store: some SessionSnapshotStore
   ) {
     self.clock = clock
+    self.wallClock = wallClock
     self.batteryLevel = batteryLevel
     self.store = store
   }
@@ -57,64 +62,71 @@ public actor WorkoutSession {
     guard stateValue == .idle else {
       throw SessionError.alreadyActive
     }
-    runID = UUID()
-    startedAtWall = Date()
-    accumulatedActive = 0
+    let id = UUID()
+    let startedAt = wallClock()
+    let battery = batteryLevel()
+    try store.save(
+      SessionSnapshotModel(
+        id: id, startedAtWall: startedAt, accumulatedActive: 0, state: .active,
+        batteryLevelAtStart: battery, batteryLevel: battery, checkpointAtWall: startedAt))
+    runID = id
+    startedAtWall = startedAt
     segmentStart = clock()
-    batteryLevelAtStart = batteryLevel()
-    finishedRecord = nil
+    batteryLevelAtStart = battery
     stateValue = .active
-    try persist()
   }
 
-  public func pause() throws {
+  public func pause(distanceMeters: Double? = nil) throws {
     guard stateValue == .active else {
       throw SessionError.notActive
     }
-    accumulatedActive += currentSegment()
+    let elapsed = activeElapsed
+    let snapshot = try persist(state: .paused, elapsed: elapsed, distanceMeters: distanceMeters)
+    pausedAt = snapshot.checkpointAtWall
+    accumulatedActive = elapsed
     segmentStart = nil
     stateValue = .paused
-    try persist()
   }
 
-  public func resume() throws {
+  public func resume(distanceMeters: Double? = nil) throws {
     guard stateValue == .paused else {
       throw SessionError.notPaused
     }
+    let snapshot = try persist(
+      state: .active, elapsed: accumulatedActive, distanceMeters: distanceMeters)
+    if let pause = pauseEnding(at: snapshot.checkpointAtWall) {
+      pauses.append(pause)
+    }
+    pausedAt = nil
     segmentStart = clock()
     stateValue = .active
-    try persist()
   }
 
-  public func finish(reason: FinishReason = .userFinished) throws -> FinishedRunModel {
+  public func finish(
+    reason: FinishReason = .userFinished, distanceMeters: Double? = nil
+  ) throws -> FinishedRunModel {
     if let finishedRecord {
       return finishedRecord
     }
     guard stateValue == .active || stateValue == .paused else {
       throw SessionError.nothingToFinish
     }
-    accumulatedActive += currentSegment()
+    let snapshot = try persist(
+      state: .finished, elapsed: activeElapsed, distanceMeters: distanceMeters, finishReason: reason
+    )
+    guard let record = snapshot.pendingRun else { throw SessionError.nothingToFinish }
+    accumulatedActive = record.activeElapsed
     segmentStart = nil
     stateValue = .finished
-    let record = FinishedRunModel(
-      id: runID ?? UUID(),
-      startedAtWall: startedAtWall ?? Date(),
-      activeElapsed: accumulatedActive,
-      finishedAtWall: Date(),
-      finishReason: reason,
-      batteryLevelAtStart: batteryLevelAtStart,
-      batteryLevelAtEnd: batteryLevel()
-    )
     finishedRecord = record
-    try persist()
     return record
   }
 
-  public func checkpoint() throws {
+  public func checkpoint(distanceMeters: Double? = nil) throws {
     guard stateValue == .active || stateValue == .paused else {
       return
     }
-    try persist()
+    try persist(state: stateValue, elapsed: activeElapsed, distanceMeters: distanceMeters)
   }
 
   /// Cuts an unfinished run at its last snapshot. Returns `nil` when there
@@ -147,16 +159,32 @@ public actor WorkoutSession {
     return clock() - segmentStart
   }
 
-  private func persist() throws {
+  private func pauseEnding(at end: Date) -> DateInterval? {
+    guard let pausedAt, pausedAt < end else { return nil }
+    return DateInterval(start: pausedAt, end: end)
+  }
+
+  @discardableResult
+  private func persist(
+    state: SessionState, elapsed: TimeInterval, distanceMeters: Double?,
+    finishReason: FinishReason? = nil
+  ) throws -> SessionSnapshotModel {
+    guard let runID, let startedAtWall else { throw SessionError.notActive }
+    let checkpoint = wallClock()
+    let pauseIntervals = pauses + (pauseEnding(at: checkpoint).map { [$0] } ?? [])
     let snapshot = SessionSnapshotModel(
-      id: runID ?? UUID(),
-      startedAtWall: startedAtWall ?? Date(),
-      accumulatedActive: activeElapsed,
-      state: stateValue,
+      id: runID,
+      startedAtWall: startedAtWall,
+      accumulatedActive: elapsed,
+      state: state,
       batteryLevelAtStart: batteryLevelAtStart,
       batteryLevel: batteryLevel(),
-      checkpointAtWall: Date()
+      checkpointAtWall: checkpoint,
+      distanceMeters: distanceMeters,
+      finishReason: finishReason,
+      pauses: pauseIntervals
     )
     try store.save(snapshot)
+    return snapshot
   }
 }

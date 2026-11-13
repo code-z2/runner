@@ -12,6 +12,21 @@ import Testing
 
 struct AppLinkRouteTests {
 
+  @MainActor
+  @Test
+  func stackCannotPopLiveButCanPopCompletedSummary() {
+    let navigation = HomeNavigation()
+    let live = HomeDestination.live(distanceKilometers: nil)
+    navigation.open(live)
+    navigation.updatePathFromNavigationStack([])
+    #expect(navigation.path == [live])
+
+    let summary = RunSummary(id: UUID(), distanceMeters: nil, elapsed: 60, date: .now)
+    navigation.path = [.summary(summary)]
+    navigation.updatePathFromNavigationStack([])
+    #expect(navigation.path.isEmpty)
+  }
+
   private var host: String { AppConstants.associatedDomain }
 
   private func route(_ string: String) -> AppLinkRoute? {

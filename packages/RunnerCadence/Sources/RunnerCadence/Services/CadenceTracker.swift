@@ -27,10 +27,16 @@ public actor CadenceTracker {
     }
     let (stream, continuation) = AsyncStream.makeStream(of: CadenceEvent.self)
     self.continuation = continuation
-    try await source.start { event in
-      continuation.yield(event)
+    do {
+      try await source.start { event in
+        continuation.yield(event)
+      }
+      return stream
+    } catch {
+      continuation.finish()
+      self.continuation = nil
+      throw error
     }
-    return stream
   }
 
   public func stop() async {

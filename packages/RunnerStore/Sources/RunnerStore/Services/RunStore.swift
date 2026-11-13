@@ -16,7 +16,8 @@ public actor RunStore {
 
   public func record(
     _ run: FinishedRunModel,
-    distanceMeters: Double?
+    distanceMeters: Double?,
+    cadenceStepsPerMinute: Int? = nil
   ) throws -> RunRecordSnapshot {
     let runID = run.id
     let existing: [RunRecordModel]
@@ -40,12 +41,14 @@ public actor RunStore {
       finishReasonRaw: String(describing: run.finishReason),
       batteryLevelAtStart: run.batteryLevelAtStart,
       batteryLevelAtEnd: run.batteryLevelAtEnd,
+      cadenceStepsPerMinute: cadenceStepsPerMinute,
       recordedAt: Date()
     )
     modelContext.insert(model)
     do {
       try modelContext.save()
     } catch {
+      modelContext.rollback()
       throw StoreError.saveFailed
     }
     return RunRecordSnapshot(model: model)

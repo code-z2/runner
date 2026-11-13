@@ -19,6 +19,8 @@ public struct FileSessionSnapshotStore: SessionSnapshotStore, Sendable {
 
   public func save(_ snapshot: SessionSnapshotModel) throws {
     let data = try JSONEncoder().encode(snapshot)
+    try FileManager.default.createDirectory(
+      at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
     try data.write(to: fileURL, options: .atomic)
   }
 

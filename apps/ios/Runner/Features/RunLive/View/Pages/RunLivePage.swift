@@ -6,16 +6,28 @@ struct RunLivePage: View {
   let goalKilometers: Double?
   let pacePilotEnabled: Bool
   var previewDistance: Double?
-  var finish: (TimeInterval) -> Void = { _ in }
+  var model: RunLiveViewModel?
+  var onStartFailure: () -> Void = {}
+  var onFinish: (RunSummary) async -> Void = { _ in }
 
   @State
-  private var segmentStart = Date.now
+  private var error: LocalizedStringResource?
 
   @State
-  private var accumulated: TimeInterval = 0
+  private var startFailed = false
 
-  @State
-  private var paused = false
+  private var paused: Bool { model?.state == .paused }
+  private var distance: Double? { previewDistance ?? model?.distanceMeters.map { $0 / 1_000 } }
+  private var canPause: Bool { model?.state == .active || paused }
+  private var canFinish: Bool { canPause || model?.state == .finished }
+  private var status: LocalizedStringKey {
+    switch model?.state {
+    case .idle: "Starting"
+    case .paused: "Paused"
+    case .finished: "Finished"
+    default: "Recording"
+    }
+  }
 
   @Environment(\.dynamicTypeSize)
   private var dynamicType
@@ -24,7 +36,7 @@ struct RunLivePage: View {
     ScrollView {
       VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
         HStack {
-          Label(paused ? "Paused" : "Recording", systemImage: "circle.fill")
+          Label(status, systemImage: "circle.fill")
             .runnerText(.caption)
             .foregroundStyle(paused ? Theme.Colors.foregroundSecondary : Theme.Colors.live)
             .padding(.horizontal, Theme.Spacing.md)
@@ -42,23 +54,23 @@ struct RunLivePage: View {
           Text("Distance").runnerText(.eyebrow)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
           HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-            Text((previewDistance ?? 0).formatted(.number.precision(.fractionLength(2))))
+            Text(distance?.formatted(.number.precision(.fractionLength(2))) ?? "—")
               .runnerText(.metricHero)
               .lineLimit(1)
               .minimumScaleFactor(0.35)
             Text("km").runnerText(.statLight)
               .foregroundStyle(Theme.Colors.foregroundSecondary)
           }
-          if let goalKilometers, goalKilometers > 0 {
-            ProgressView(value: min(previewDistance ?? 0, goalKilometers), total: goalKilometers)
+          if let goalKilometers, goalKilometers > 0, let distance {
+            ProgressView(value: min(distance, goalKilometers), total: goalKilometers)
               .tint(Theme.Colors.highlight)
             HStack {
               Text(
-                "\((previewDistance ?? 0).formatted(.number.precision(.fractionLength(2)))) of \(goalKilometers.formatted(.number.precision(.fractionLength(2)))) km"
+                "\((distance).formatted(.number.precision(.fractionLength(2)))) of \(goalKilometers.formatted(.number.precision(.fractionLength(2)))) km"
               )
               Spacer()
               Text(
-                "\(max(0, (goalKilometers - (previewDistance ?? 0)) * 1_000).formatted(.number.precision(.fractionLength(0)))) m to go"
+                "\(max(0, (goalKilometers - (distance)) * 1_000).formatted(.number.precision(.fractionLength(0)))) m to go"
               )
               .foregroundStyle(Theme.Colors.highlight)
             }
@@ -75,19 +87,28 @@ struct RunLivePage: View {
             count: dynamicType.isAccessibilitySize ? 1 : 2),
           alignment: .leading, spacing: Theme.Spacing.md
         ) {
-          TimelineView(.periodic(from: segmentStart, by: 1)) { context in
-            let elapsed =
-              accumulated + (paused ? 0 : max(0, context.date.timeIntervalSince(segmentStart)))
-            RunMetric(
-              label: "Time",
-              value: previewDistance == nil
-                ? Duration.seconds(elapsed.rounded(.down)).formatted(.time(pattern: .minuteSecond))
-                : "24:18")
-          }
-          RunMetric(label: "Pace", value: previewDistance == nil ? nil : "5:02", unit: "/km")
-          RunMetric(label: "Avg pace", value: previewDistance == nil ? nil : "5:03", unit: "/km")
-          RunMetric(label: "Cadence", value: previewDistance == nil ? nil : "172", unit: "spm")
-          RunMetric(label: "Heart rate", value: nil, unit: "bpm")
+          RunMetric(
+            label: "Time",
+            value: previewDistance == nil
+              ? RunHistoryMetrics.time(model?.elapsed ?? 0)
+              : "24:18")
+          RunMetric(
+            label: "Pace",
+            value: previewDistance == nil
+              ? model?.pace.flatMap(RunHistoryMetrics.paceTime) : "5:02",
+            unit: "/km")
+          RunMetric(
+            label: "Avg pace",
+            value: previewDistance == nil
+              ? model?.averagePace.flatMap(RunHistoryMetrics.paceMinutes) : "5", unit: "min/km")
+          RunMetric(
+            label: "Cadence",
+            value: previewDistance == nil
+              ? model?.cadenceStepsPerMinute?.formatted(.number.precision(.fractionLength(0)))
+              : "172", unit: "spm")
+          RunMetric(
+            label: "Heart rate",
+            value: model?.heartRate?.formatted(.number.precision(.fractionLength(0))), unit: "bpm")
           RunMetric(label: "Runners crossed", value: previewDistance == nil ? "0" : "3")
         }
 
@@ -97,9 +118,12 @@ struct RunLivePage: View {
       .padding(.vertical, Theme.Spacing.sm)
     }
     .safeAreaInset(edge: .bottom) {
-      RunLiveControls(paused: paused, togglePause: togglePause) {
-        finish(accumulated + (paused ? 0 : max(0, Date.now.timeIntervalSince(segmentStart))))
-      }
+      RunLiveControls(
+        paused: paused, canPause: canPause, canFinish: canFinish,
+        togglePause: { Task { await togglePause() } },
+        finish: { Task { await finish() } }
+      )
+      .disabled(model?.isUpdating == true)
       .padding(.horizontal, Theme.Spacing.screenInset)
       .padding(.vertical, Theme.Spacing.sm)
       .background(Theme.Colors.background)
@@ -109,16 +133,56 @@ struct RunLivePage: View {
     .environment(\.colorScheme, .dark)
     .toolbarVisibility(.hidden, for: .navigationBar)
     .statusBarHidden(false)
+    .navigationBarBackButtonHidden()
+    .task {
+      guard let model else { return }
+      do {
+        try await model.start()
+        while !Task.isCancelled {
+          await model.updateElapsed()
+          try await Task.sleep(for: .seconds(1))
+        }
+      } catch is CancellationError {
+        return
+      } catch {
+        startFailed = true
+        self.error = "Couldn’t start the run."
+      }
+    }
+    .alert(
+      "Run recording",
+      isPresented: Binding(
+        get: { error != nil }, set: { if !$0 { error = nil } }
+      ), presenting: error
+    ) { _ in
+      if startFailed {
+        Button("Back to Run", action: onStartFailure)
+      } else {
+        Button("OK", role: .cancel) {}
+      }
+    } message: { error in
+      Text(error)
+    }
   }
 
-  private func togglePause() {
-    if paused {
-      segmentStart = .now
-    } else {
-      accumulated += max(0, Date.now.timeIntervalSince(segmentStart))
+  private func togglePause() async {
+    do {
+      try await model?.togglePause()
+    } catch {
+      self.error = "Couldn’t change the recording state. Try again."
     }
-    paused.toggle()
   }
+
+  private func finish() async {
+    do {
+      if let savedRun = try await model?.finish() {
+        await onFinish(savedRun)
+      }
+    } catch {
+      self.error = "Couldn’t save the run. Use Finish to try again."
+    }
+  }
+
 }
 
 #Preview("Live · PacePilot on") {

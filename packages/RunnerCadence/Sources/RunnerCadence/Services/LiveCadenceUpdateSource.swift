@@ -42,9 +42,9 @@ public final class LiveCadenceUpdateSource: CadenceUpdateSource, @unchecked Send
     }
     let authorized: Bool
     switch authorizationChecker() {
-    case .authorized:
+    case .authorized, .notDetermined:
       authorized = true
-    case .denied, .restricted, .notDetermined:
+    case .denied, .restricted:
       authorized = false
     @unknown default:
       authorized = false

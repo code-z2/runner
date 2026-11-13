@@ -22,15 +22,48 @@ public final class LiveHealthKitStore: HealthKitGateway, @unchecked Sendable {
 
   private let healthStore = HKHealthStore()
 
+  @MainActor private var workoutSession: HKWorkoutSession?
+
   public init() {}
 
+  @MainActor
+  public func startWorkoutSession(at date: Date) throws {
+    guard workoutSession == nil, canSaveWorkouts else { return }
+    let configuration = HKWorkoutConfiguration()
+    configuration.activityType = .running
+    configuration.locationType = .outdoor
+    let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+    workoutSession = session
+    session.startActivity(with: date)
+  }
+
+  @MainActor public func pauseWorkoutSession() {
+    workoutSession?.pause()
+  }
+
+  @MainActor public func resumeWorkoutSession() {
+    workoutSession?.resume()
+  }
+
+  @MainActor public func endWorkoutSession() {
+    workoutSession?.end()
+    workoutSession = nil
+  }
+
+  public var canSaveWorkouts: Bool {
+    HKHealthStore.isHealthDataAvailable()
+      && healthStore.authorizationStatus(for: .workoutType()) == .sharingAuthorized
+  }
+
   public func requestAccess() async throws {
-    guard let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate) else {
+    guard HKHealthStore.isHealthDataAvailable(),
+      let distance = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)
+    else {
       throw HealthKitError.unavailable
     }
     try await healthStore.requestAuthorization(
-      toShare: [.workoutType()],
-      read: [heartRate]
+      toShare: [.workoutType(), distance],
+      read: []
     )
     guard healthStore.authorizationStatus(for: .workoutType()) == .sharingAuthorized else {
       throw HealthKitError.notAuthorized
@@ -50,6 +83,22 @@ public final class LiveHealthKitStore: HealthKitGateway, @unchecked Sendable {
     )
     do {
       try await builder.beginCollection(at: run.startedAtWall)
+      try await builder.addMetadata([
+        HKMetadataKeySyncIdentifier: run.id.uuidString,
+        HKMetadataKeySyncVersion: 1,
+      ])
+      let pauseEvents = run.pauses.flatMap { pause in
+        [
+          HKWorkoutEvent(
+            type: .pause, dateInterval: DateInterval(start: pause.start, duration: 0), metadata: nil
+          ),
+          HKWorkoutEvent(
+            type: .resume, dateInterval: DateInterval(start: pause.end, duration: 0), metadata: nil),
+        ]
+      }
+      if !pauseEvents.isEmpty {
+        try await builder.addWorkoutEvents(pauseEvents)
+      }
       let activity = HKWorkoutActivity(
         workoutConfiguration: configuration,
         start: run.startedAtWall,
@@ -58,14 +107,19 @@ public final class LiveHealthKitStore: HealthKitGateway, @unchecked Sendable {
       )
       try await builder.addWorkoutActivity(activity)
       if let distanceMeters,
-        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)
+        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
+        healthStore.authorizationStatus(for: distanceType) == .sharingAuthorized
       {
         let quantity = HKQuantity(unit: .meter(), doubleValue: distanceMeters)
         let sample = HKQuantitySample(
           type: distanceType,
           quantity: quantity,
           start: run.startedAtWall,
-          end: run.finishedAtWall
+          end: run.finishedAtWall,
+          metadata: [
+            HKMetadataKeySyncIdentifier: "\(run.id.uuidString)-distance",
+            HKMetadataKeySyncVersion: 1,
+          ]
         )
         try await builder.addSamples([sample])
       }

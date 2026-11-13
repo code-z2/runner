@@ -8,6 +8,7 @@
 import Foundation
 import RunnerSession
 import RunnerStoreTesting
+import SwiftData
 import Testing
 
 @testable import RunnerStore
@@ -30,6 +31,38 @@ struct RunStoreTests {
       batteryLevelAtEnd: 0.8
     )
     return (run, distanceMeters)
+  }
+
+  @Test
+  func versionOneHistoryMigratesAndNewRunsKeepCadence() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let configuration = ModelConfiguration(url: directory.appending(path: "runner.store"))
+    let (oldRun, distance) = finishedRun()
+    do {
+      let schema = Schema(versionedSchema: RunnerStoreSchemaV1.self)
+      let container = try ModelContainer(for: schema, configurations: [configuration])
+      let context = ModelContext(container)
+      context.insert(
+        RunnerStoreSchemaV1.RunRecordModel(
+          runID: oldRun.id, startedAt: oldRun.startedAtWall, activeElapsed: oldRun.activeElapsed,
+          distanceMeters: distance, finishReasonRaw: "userFinished",
+          batteryLevelAtStart: nil, batteryLevelAtEnd: nil, recordedAt: .now))
+      try context.save()
+    }
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV2.self)
+    let container = try ModelContainer(
+      for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
+    let store = RunStore(modelContainer: container)
+    let existing = try await store.recentRuns()
+    #expect(existing.first?.id == oldRun.id)
+    #expect(existing.first?.distanceMeters == distance)
+    #expect(existing.first?.cadenceStepsPerMinute == nil)
+    let (newRun, newDistance) = finishedRun()
+    _ = try await store.record(newRun, distanceMeters: newDistance, cadenceStepsPerMinute: 158)
+    let saved = try await store.recentRuns()
+    #expect(saved.first { $0.id == newRun.id }?.cadenceStepsPerMinute == 158)
   }
 
   @Test

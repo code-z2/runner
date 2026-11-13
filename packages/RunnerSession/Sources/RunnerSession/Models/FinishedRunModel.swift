@@ -24,6 +24,8 @@ public struct FinishedRunModel: Sendable, Equatable {
 
   public let batteryLevelAtEnd: Float?
 
+  public let pauses: [DateInterval]
+
   public init(
     id: UUID,
     startedAtWall: Date,
@@ -31,7 +33,8 @@ public struct FinishedRunModel: Sendable, Equatable {
     finishedAtWall: Date,
     finishReason: FinishReason,
     batteryLevelAtStart: Float?,
-    batteryLevelAtEnd: Float?
+    batteryLevelAtEnd: Float?,
+    pauses: [DateInterval] = []
   ) {
     self.id = id
     self.startedAtWall = startedAtWall
@@ -40,5 +43,6 @@ public struct FinishedRunModel: Sendable, Equatable {
     self.finishReason = finishReason
     self.batteryLevelAtStart = batteryLevelAtStart
     self.batteryLevelAtEnd = batteryLevelAtEnd
+    self.pauses = pauses
   }
 }

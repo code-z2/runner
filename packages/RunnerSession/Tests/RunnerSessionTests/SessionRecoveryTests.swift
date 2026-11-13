@@ -14,6 +14,49 @@ import Testing
 struct SessionRecoveryTests {
 
   @Test
+  func finishedDraftKeepsExactTotalsUntilHistoryCanCommit() async throws {
+    let store = InMemorySessionSnapshotStore()
+    let clock = ManualClock()
+    let session = WorkoutSession(
+      clock: { clock.now }, wallClock: { Date(timeIntervalSince1970: clock.now) }, store: store)
+    let start = Date(timeIntervalSince1970: clock.now)
+    try await session.start()
+    clock.advance(by: 30)
+    try await session.pause(distanceMeters: 125)
+    clock.advance(by: 20)
+    let paused = try #require(try store.load())
+    #expect(paused.pendingRun?.activeElapsed == 30)
+    #expect(paused.pendingRun?.finishReason == .crashCut)
+    #expect(paused.distanceMeters == 125)
+
+    try await session.resume(distanceMeters: 125)
+    clock.advance(by: 10)
+    let finished = try await session.finish(distanceMeters: 150)
+    let pending = try #require(try store.load())
+    #expect(pending.pendingRun == finished)
+    #expect(pending.pendingRun?.activeElapsed == 40)
+    #expect(pending.distanceMeters == 150)
+    #expect(finished.pauses == [DateInterval(start: start.addingTimeInterval(30), duration: 20)])
+    #expect(finished.finishedAtWall.timeIntervalSince(start) == 60)
+  }
+
+  @Test
+  func finishingWhilePausedClosesThePauseAtFinish() async throws {
+    let store = InMemorySessionSnapshotStore()
+    let clock = ManualClock()
+    let session = WorkoutSession(
+      clock: { clock.now }, wallClock: { Date(timeIntervalSince1970: clock.now) }, store: store)
+    try await session.start()
+    clock.advance(by: 30)
+    try await session.pause()
+    clock.advance(by: 15)
+    let finished = try await session.finish()
+    #expect(finished.activeElapsed == 30)
+    #expect(finished.pauses.first?.duration == 15)
+    #expect(finished.pauses.first?.end == finished.finishedAtWall)
+  }
+
+  @Test
   func interruptedRunIsCutAtSnapshotValues() throws {
     let store = InMemorySessionSnapshotStore()
     let snapshot = SessionSnapshotModel(
