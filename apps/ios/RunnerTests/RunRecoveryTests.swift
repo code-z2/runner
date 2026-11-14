@@ -222,19 +222,20 @@ struct RunRecoveryTests {
 
   @MainActor
   @Test
-  func healthExportRequiresOptInAndSkipsInterruptedRuns() async throws {
+  func healthExportRequiresOptInAndSkipsInterruptedAndShortRuns() async throws {
     let suite = "RunRecoveryTests.\(UUID().uuidString)"
     let preferences = try #require(UserDefaults(suiteName: suite))
     defer { preferences.removePersistentDomain(forName: suite) }
     let store = RunStore(modelContainer: try AppDatabase.ephemeral().container)
     let drafts = InMemorySessionSnapshotStore()
     let health = TestHealthGateway()
+    let feed = TestLocationFeed()
     func makeLive() -> RunLiveViewModel {
       RunLiveViewModel(
         snapshots: drafts, store: { store },
-        location: LocationTracker(source: TestLocationFeed()),
+        location: LocationTracker(source: feed),
         cadence: CadenceTracker(source: LiveCadenceUpdateSource(availabilityChecker: { false })),
-        healthKit: health, preferences: preferences, canTrackLocation: { false })
+        healthKit: health, preferences: preferences, canTrackLocation: { true })
     }
     let initial = makeLive()
     try await initial.start()
@@ -248,9 +249,22 @@ struct RunRecoveryTests {
     try drafts.save(interrupted)
     try await live.recover()
     #expect(health.workoutTransitions.isEmpty)
+    // About 111 m: kept in history, not sent to Health.
+    try await live.start()
+    await feed.send(longitude: 0)
+    await feed.send(longitude: 0.001)
+    try await waitForDistance(in: live, greaterThan: 100)
+    let short = try await live.finish()
+    #expect((short?.distanceMeters ?? 0) < RunLiveViewModel.minimumHealthExportMeters)
+    let afterShort = health.workoutTransitions.count
+
+    // About 612 m: saved to Health.
     try await live.start()
     try await live.togglePause()
     try await live.togglePause()
+    await feed.send(longitude: 0)
+    await feed.send(longitude: 0.0055)
+    try await waitForDistance(in: live, greaterThan: 500)
     let finished = try await live.finish()
     let finishedID = try #require(finished?.id)
     let deadline = ContinuousClock.now + .seconds(2)
@@ -258,10 +272,18 @@ struct RunRecoveryTests {
       try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await health.savedIDs == [finishedID])
-    #expect(health.workoutTransitions == [.active, .paused, .active, .finished])
+    #expect(
+      Array(health.workoutTransitions.dropFirst(afterShort)) == [
+        .active, .paused, .active, .finished,
+      ])
+    #expect(saved(short?.id, in: try await store.recentRuns()))
     let saved = try await store.recentRuns()
     #expect(saved.contains { $0.id == interrupted.id })
     #expect(saved.contains { $0.id == privateRun?.id })
+  }
+
+  private func saved(_ id: UUID?, in runs: [RunRecordSnapshot]) -> Bool {
+    runs.contains { $0.id == id }
   }
 
   private func snapshot(

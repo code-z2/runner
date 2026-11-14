@@ -1090,6 +1090,18 @@ Living record of what was built. Update on every completed item.
   The immediate summary and History read the same durations. Earlier
   records migrate with empty splits because they only contain totals.
 
+### Apple Health saves only runs over 0.2 km
+
+- With Apple Health export on, a finished run is saved to Health only when
+  it covers more than 200 m (`RunLiveViewModel.minimumHealthExportMeters`).
+  Shorter runs, and runs with no recorded distance, stay in Runner's
+  history but are not written to Health.
+- Why: accidental starts and quick tests were cluttering the user's Health
+  workouts. The live workout session never writes a workout itself; only
+  the post-run save does, so this one check covers every export.
+- Tested with the location test feed: a 111 m run is skipped and a 612 m
+  run is saved.
+
 ### Goals loading skeleton
 
 - While Goals loads for the first time, a placeholder goal card shows grey
