@@ -14,13 +14,18 @@ how it is spent.
 
 ## Try it
 
-> **Heads up:** the public TestFlight link is not open yet. Apple has not
-> approved the build for outside testers.
+Public TestFlight link: <https://testflight.apple.com/join/tk76k7Ny>
+
+> **Heads up:** Apple has not approved the build for outside testers yet,
+> so the link above will not let you in until it does. Once it is
+> approved, the same link works and you can join straight away.
 >
-> To try the app now, email **contras.canto-3s@icloud.com** with the email address
-> of your Apple account. You will be added to internal testing and get a
-> TestFlight invitation. You need an iPhone on iOS 26 or later; Goals and
-> Club do not run in the simulator.
+> To try the app before then, email **contras.canto-3s@icloud.com** with
+> the email address of your Apple account. You will be added to internal
+> testing and get a TestFlight invitation.
+>
+> You need an iPhone on iOS 26 or later. Goals and Club do not run in the
+> simulator.
 
 ## How it works
 
