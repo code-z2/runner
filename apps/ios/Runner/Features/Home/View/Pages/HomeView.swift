@@ -1,9 +1,11 @@
+import RunnerUI
 import SwiftUI
 
 struct HomeView: View {
 
   let run: RunViewModel
   var live: RunLiveViewModel?
+  var goalService: GoalService?
   let weatherModel: WeatherModel
   var date: Date = .now
   @AppStorage("pacePilot.enabled")
@@ -15,8 +17,11 @@ struct HomeView: View {
   @State
   private var selection = HomeTab.run
 
-  private var isWorkoutFlow: Bool {
-    guard selection == .run else { return false }
+  @State
+  private var goals = GoalsViewModel()
+
+  private var hidesTabBar: Bool {
+    if selection == .goals { return !navigation.goalPath.isEmpty }
     switch navigation.path.last {
     case .countdown, .live, .summary: return true
     default: return false
@@ -65,7 +70,7 @@ struct HomeView: View {
                 elapsed: savedRun.elapsed, date: savedRun.date,
                 distanceKilometers: RunHistoryMetrics.kilometers(savedRun.distanceMeters),
                 cadence: savedRun.cadenceStepsPerMinute,
-                encounters: savedRun.encounters,
+                encounters: savedRun.encounters, splits: savedRun.splits,
                 healthConnection: live, showsLatestHealthExport: destination == .summary(savedRun))
             case .history:
               RunHistoryPage(runs: run.runs, unavailable: run.historyUnavailable)
@@ -75,13 +80,23 @@ struct HomeView: View {
         .toolbarVisibility(.hidden, for: .tabBar)
       }
       Tab("Goals", systemImage: "target", value: HomeTab.goals) {
-        ContentUnavailableView("No goals yet", systemImage: "target")
-          .toolbarVisibility(.hidden, for: .tabBar)
+        GoalsNavigation(
+          model: goals, service: goalService, runs: run.runs, path: $navigation.goalPath
+        )
+        .toolbarVisibility(.hidden, for: .tabBar)
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if !isWorkoutFlow {
-        HomeTabBar(selection: $selection, openPacePilot: navigation.openPacePilot)
+      if !hidesTabBar {
+        VStack(spacing: 0) {
+          if selection == .goals && goals.canStartFunding {
+            Button("Lock a goal") { navigation.goalPath.append(.lock) }
+              .buttonStyle(.pill())
+              .padding(.horizontal, Theme.Spacing.screenInset)
+              .padding(.vertical, Theme.Spacing.sm)
+          }
+          HomeTabBar(selection: $selection, openPacePilot: navigation.openPacePilot)
+        }
       }
     }
     .fullScreenCover(isPresented: $navigation.showingPacePilot) {

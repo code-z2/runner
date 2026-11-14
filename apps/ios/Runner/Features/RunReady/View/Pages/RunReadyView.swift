@@ -55,7 +55,7 @@ struct RunReadyView: View {
     .foregroundStyle(Theme.Colors.foreground)
     .modifier(RunReadyToolbar(visible: usesNativeHeader, date: date) { open(.community) })
     .sheet(isPresented: $showingDistance) {
-      RunDistanceSheet(selection: customDistance) { selection in
+      DistanceSheet(selection: customDistance) { selection in
         customDistance = selection
         distance = .custom(selection)
       }

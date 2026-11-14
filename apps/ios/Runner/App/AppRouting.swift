@@ -78,11 +78,18 @@ enum HomeDestination: Hashable, Sendable {
   case savedSummary(RunSummary)
 }
 
+enum GoalDestination: Hashable, Sendable {
+  case lock
+  case funding(GoalDraft, requestID: UUID)
+}
+
 @Observable
 @MainActor
 final class HomeNavigation {
 
   var path: [HomeDestination] = []
+
+  var goalPath: [GoalDestination] = []
 
   var showingPacePilot = false
 
