@@ -1,12 +1,11 @@
 import { verifyAssertion, verifyKeyAttestation } from "../appAttest";
 import { attestorSecret, signClaimPass, signRunProof } from "../attestor";
-import { fromBase64, hashHex, randomBytes, toBase64, utf8 } from "../codec";
+import { fromBase64, hashHex, randomBytes, toBase64, toHex, utf8 } from "../codec";
 import { CLAIM_WINDOW_S, GAP_S, checkEligibility, maxAmountCents, parseActivity } from "../eligibility";
 import { nowSeconds, requireSettings, type Env } from "../env";
 import { isCell } from "../geohash";
 import { HttpError, json, parseObject, readJson, stringField } from "../http";
 import { isAccountId, isFullAccessKey, parsePublicKey, verifyNep413 } from "../near";
-import { ensureSeeded } from "./seed";
 
 const CHALLENGE_TTL_S = 300;
 const MAX_CELLS = 9;
@@ -19,7 +18,7 @@ export async function createChallenge(env: Env): Promise<Response> {
   return json({ challenge }, 201);
 }
 
-async function consumeChallenge(env: Env, challenge: string): Promise<Uint8Array> {
+export async function consumeChallenge(env: Env, challenge: string): Promise<Uint8Array> {
   const bytes = fromBase64(challenge, "invalid_challenge");
   const result = await env.DB.prepare("DELETE FROM challenges WHERE id = ? AND expires_at > ?")
     .bind(challenge, nowSeconds())
@@ -96,11 +95,6 @@ export async function createAttestation(request: Request, env: Env): Promise<Res
   const activity = parseActivity(content.activity);
   const challenge = await consumeChallenge(env, stringField(content, "challenge", 64));
 
-  // A fresh implicit account does not exist on-chain yet and the
-  // full-access check below would fail closed. Fund it from the DAO
-  // seeder first; an existing account is untouched.
-  await ensureSeeded(env, accountId);
-
   await checkDevice(env, keyId, assertion, payload);
   const signed = verifyNep413({
     message: payload,
@@ -109,7 +103,9 @@ export async function createAttestation(request: Request, env: Env): Promise<Res
     publicKey: nearPublicKey,
     signature: nearSignature,
   });
-  if (!signed || !(await isFullAccessKey(env.NEAR_RPC_URL, accountId, nearPublicKeyText))) {
+  if (!signed) throw new HttpError(401, "invalid_near_signature");
+  if (accountId !== toHex(nearPublicKey) &&
+      !(await isFullAccessKey(env.NEAR_RPC_URL, accountId, nearPublicKeyText))) {
     throw new HttpError(401, "invalid_near_signature");
   }
 
