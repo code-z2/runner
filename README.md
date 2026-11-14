@@ -12,6 +12,16 @@ Runners around the world run, meet, and share one goal: keep each other
 running. The money serves the club. The club, through its DAO, decides
 how it is spent.
 
+## Try it
+
+> **Heads up:** the public TestFlight link is not open yet. Apple has not
+> approved the build for outside testers.
+>
+> To try the app now, email **contras.canto-3s@icloud.com** with the email address
+> of your Apple account. You will be added to internal testing and get a
+> TestFlight invitation. You need an iPhone on iOS 26 or later; Goals and
+> Club do not run in the simulator.
+
 ## How it works
 
 - **Run.** The app tracks your runs, counts the runners you pass, and
