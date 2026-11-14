@@ -15,7 +15,7 @@ pub mod chain;
 pub mod intents;
 
 pub use chain::{AccessKeyInfo, BlockRef, NearRpc, TxAction, TxOutcome};
-pub use intents::{IntentQuote, IntentQuoteRequest, IntentStatus, IntentStatusReport, IntentToken, NearIntents};
+pub use intents::{IntentQuote, IntentQuoteRequest};
 
 /// Every failure mode of the core, typed once.
 #[derive(Debug, thiserror::Error, uniffi::Error)]

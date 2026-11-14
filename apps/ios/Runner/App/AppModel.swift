@@ -9,6 +9,7 @@ import Foundation
 import RunnerAuth
 import RunnerCadence
 import RunnerEncounters
+import RunnerEscrow
 import RunnerGateway
 import RunnerHealthKit
 import RunnerLocation
@@ -28,6 +29,8 @@ final class AppModel {
   /// a bad base URL degrades to unavailable wallet actions, never a
   /// launch crash. Nothing in the launch or run path reads this.
   let gateway: RunnerGatewayClient?
+
+  let goals: GoalService?
 
   let near: NearStack
 
@@ -98,6 +101,21 @@ final class AppModel {
     }
 
     let core = LiveNearCore()
+    if AppEnvironment.current != .dev, let gateway,
+      let workerURL = URL(string: AppEnvironment.current.apiBaseURL),
+      let mainnet = try? LiveNearRpc(rpcURL: "https://rpc.mainnet.fastnear.com")
+    {
+      let deployment = EscrowDeployment.mainnet
+      let account = GoalAccount(
+        gateway: gateway, core: core, rpc: mainnet, keychain: keychain, deployment: deployment)
+      goals = GoalService(
+        account: account, gateway: gateway,
+        intents: ProxiedIntentClient(baseURL: workerURL) { try await account.assert($0) },
+        escrow: LiveEscrowService(rpc: mainnet, submitter: account, deployment: deployment),
+        deployment: deployment, evidence: GoalEvidence(keychain: keychain))
+    } else {
+      goals = nil
+    }
     let network = NearNetwork.testnet(relayerURL: AppConstants.nearRelayURL)
     // RPC is optional: a bad URL degrades wallet/auth resolution to an
     // error instead of a launch crash. Nothing on the run path reads this.

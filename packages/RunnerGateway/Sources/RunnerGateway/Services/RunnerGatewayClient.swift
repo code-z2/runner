@@ -59,6 +59,17 @@ public struct RunnerGatewayClient: GatewayClient, Sendable {
     return try await send(urlRequest, as: RelayResult.self, success: 200)
   }
 
+  public func goals(_ authorization: ClaimPassRequest) async throws -> [GoalRecord] {
+    struct Response: Decodable { let goals: [GoalRecord] }
+    let urlRequest = try post(path: "v1/goals/list", body: authorization)
+    return try await send(urlRequest, as: Response.self, success: 200).goals
+  }
+
+  public func withdrawGoal(_ authorization: ClaimPassRequest) async throws -> GoalPayout {
+    let urlRequest = try post(path: "v1/goals/withdraw", body: authorization)
+    return try await send(urlRequest, as: GoalPayout.self, success: 200)
+  }
+
   public func merchants(cells: [String]) async throws -> [MerchantLocation] {
     guard !cells.isEmpty else {
       throw GatewayError.invalidRequest("cells must not be empty")

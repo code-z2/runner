@@ -227,8 +227,10 @@ export interface RelayerKey {
   publicKeyText: string;
 }
 
-export function parseRelayerKey(text: string): RelayerKey {
+export function parseRelayerKey(input: string): RelayerKey {
   const failure = new HttpError(500, "relayer_key_invalid");
+  // Secrets piped through `echo` carry a trailing newline.
+  const text = input.trim();
   if (!text.startsWith("ed25519:")) throw failure;
   let raw: Uint8Array;
   try {
@@ -287,4 +289,22 @@ export function buildRelayTransaction(input: {
     signedTransaction: new Writer().fixed(transaction).u8(KEY_ED25519).fixed(signature).done(),
     hash: base58.encode(transactionHash),
   };
+}
+
+export function buildFunctionTransaction(input: {
+  signerId: string;
+  key: RelayerKey;
+  nonce: bigint;
+  blockHash: Uint8Array;
+  receiverId: string;
+  call: FunctionCall;
+}): Uint8Array {
+  const writer = new Writer().string(input.signerId);
+  writePublicKey(writer, input.key.publicKey);
+  writer.u64(input.nonce).string(input.receiverId).fixed(input.blockHash).u32(1)
+    .u8(ACTION_FUNCTION_CALL).string(input.call.methodName).bytes(input.call.args)
+    .u64(input.call.gas).u128(input.call.deposit);
+  const transaction = writer.done();
+  const signature = ed25519.sign(hash(transaction), input.key.secret);
+  return new Writer().fixed(transaction).u8(KEY_ED25519).fixed(signature).done();
 }

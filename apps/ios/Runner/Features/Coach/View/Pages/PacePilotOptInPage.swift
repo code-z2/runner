@@ -26,7 +26,7 @@ struct PacePilotOptInPage: View {
           VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text("•  Taps a 1–2 rhythm to settle your stride, then goes quiet")
             Text("•  Suggests a little more only when your runs show you can")
-            Text("•  Backs off when you struggle. Never pushes.")
+            Text("•  Anounces milestones by distance.")
           }
           .runnerText(.body)
 

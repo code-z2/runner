@@ -5,8 +5,8 @@ account_id = "f1e022c6d9e3a80eeb1bd8b7e4b28385"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "runner-api"
-database_id = "62403d0b-151e-480d-8775-f1be4a325256"
+database_name = "runner-api-mainnet"
+database_id = "d7f2e543-d0e8-4f3b-99fb-a26ba9951251"
 migrations_dir = "migrations"
 
 [triggers]
@@ -14,13 +14,13 @@ crons = ["0 * * * *"]
 
 [vars]
 APP_ID = "QHUBYNZ482.io.wades.ije"
-APP_ATTEST_ENV = "development"
-NEAR_RPC_URL = "https://rpc.testnet.near.org"
+APP_ATTEST_ENV = "production"
+NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
 NEAR_RECIPIENT = "runner-api"
-TREASURY_CONTRACT = "ije-v1-claims.testnet"
-ESCROW_CONTRACT = "ije-v1-escrow.testnet"
-TOKEN_CONTRACT = "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af"
-DAO_ACCOUNT = "ije-v1.sputnik-v2.testnet"
-RELAYER_ACCOUNT_ID = "ije-v1-relayer.testnet"
+TREASURY_CONTRACT = "ije-v1-claims.codez2.near"
+ESCROW_CONTRACT = "ije-v1-escrow.codez2.near"
+TOKEN_CONTRACT = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+DAO_ACCOUNT = "ije-v1.sputnik-dao.near"
+RELAYER_ACCOUNT_ID = "ije-v1-relayer.codez2.near"
 PORTAL_ORIGIN = ""
 MAIL_FROM = ""

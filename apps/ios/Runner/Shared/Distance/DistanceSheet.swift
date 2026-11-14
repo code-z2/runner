@@ -1,7 +1,7 @@
 import RunnerUI
 import SwiftUI
 
-struct RunDistanceSheet: View {
+struct DistanceSheet: View {
 
   let onConfirm: (Measurement<UnitLength>) -> Void
 
@@ -9,7 +9,7 @@ struct RunDistanceSheet: View {
   private var distance: Int
 
   @State
-  private var unit: RunDistanceUnit
+  private var unit: DistanceUnit
 
   @Environment(\.dismiss)
   private var dismiss
@@ -40,7 +40,7 @@ struct RunDistanceSheet: View {
               ForEach(1...100, id: \.self) { Text($0.formatted()).tag($0) }
             }
             Picker("Unit", selection: $unit) {
-              ForEach(RunDistanceUnit.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+              ForEach(DistanceUnit.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
           }
           .pickerStyle(.wheel)

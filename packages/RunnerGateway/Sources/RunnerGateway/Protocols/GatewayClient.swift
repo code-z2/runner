@@ -27,4 +27,11 @@ public protocol GatewayClient: Sendable {
   func relay(_ request: RelayRequest) async throws -> RelayResult
 
   func merchants(cells: [String]) async throws -> [MerchantLocation]
+
+  /// The runner's locked goals (signed `action: "list"`).
+  func goals(_ authorization: ClaimPassRequest) async throws -> [GoalRecord]
+
+  /// Reserve the payout for an unlocked goal (signed `action: "withdraw"`,
+  /// `goal_id`). The runner then signs escrow `withdraw` and relays it.
+  func withdrawGoal(_ authorization: ClaimPassRequest) async throws -> GoalPayout
 }

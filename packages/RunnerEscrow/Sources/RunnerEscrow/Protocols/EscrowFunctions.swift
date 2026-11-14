@@ -38,9 +38,9 @@ public struct EscrowReceipt: Sendable, Equatable {
   }
 }
 
-/// Relayer submission seam. No live implementation ships yet: the endpoint
-/// shape is the backend's, and inventing HTTP here would bake a wrong
-/// guess into the product. Mocks carry tests until it lands.
+/// Relayer submission seam. The app's submitter signs
+/// `call.functionCall(on:)` as a delegate action and sends it through the
+/// Worker relay.
 public protocol EscrowSubmitter: Sendable {
 
   func submit(_ call: EscrowCall) async throws -> EscrowReceipt

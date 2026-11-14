@@ -79,3 +79,47 @@ struct EscrowModelTests {
     #expect(proof.accountID == "a.near")
   }
 }
+
+struct EscrowFunctionCallTests {
+
+  @Test
+  func depositMessageMatchesTheDeployedDepositMsg() throws {
+    let id = try #require(UUID(uuidString: "0F6C4A0E-1B7A-4C1E-9C1B-2D3E4F5A6B7C"))
+    let message = try EscrowGoal(distanceM: 10_000, maxSeconds: 3_300)
+      .depositMessage(owner: "abc", fundingID: id)
+    #expect(
+      message
+        == #"{"funding_id":"0f6c4a0e-1b7a-4c1e-9c1b-2d3e4f5a6b7c","goal":{"distance_m":10000,"max_seconds":3300},"owner":"abc"}"#
+    )
+  }
+
+  @Test
+  func withdrawAndUnlockMapToEscrowCalls() throws {
+    let withdraw = try EscrowCall.withdraw(amount: "5000000", receiverID: "dep.near")
+      .functionCall(on: .mainnet)
+    #expect(withdraw.receiverID == "ije-v1-escrow.codez2.near")
+    #expect(withdraw.method == "withdraw")
+    #expect(withdraw.depositYocto == "1")
+    #expect(withdraw.argsJSON == #"{"amount":"5000000","receiver_id":"dep.near"}"#)
+
+    let unlock = try EscrowCall.unlock(lockID: 7, proofJSON: #"{"v":1}"#, signatureBase64: "c2ln")
+      .functionCall(on: .mainnet)
+    #expect(unlock.method == "unlock")
+    #expect(unlock.depositYocto == "0")
+    #expect(unlock.argsJSON == #"{"lock_id":"7","proof":"{\"v\":1}","signature":"c2ln"}"#)
+  }
+}
+
+struct EscrowLockDecodingTests {
+
+  @Test
+  func decodesTheDeployedGetLocksShape() throws {
+    let json =
+      #"[{"id":"0","owner_id":"8cb5a453","amount":"5000000","goal":{"distance_m":1000,"max_seconds":2100},"created_at":"1794668315364971571"}]"#
+    let locks = try JSONDecoder().decode([EscrowLock].self, from: Data(json.utf8))
+    #expect(locks.first?.id == 0)
+    #expect(locks.first?.amount == "5000000")
+    #expect(locks.first?.createdAt == 1_794_668_315_364_971_571)
+    #expect(locks.first?.goal == EscrowGoal(distanceM: 1_000, maxSeconds: 2_100))
+  }
+}

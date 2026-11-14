@@ -602,206 +602,6 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
- * Blocking 1Click client. One method per call the box needs — nothing
- * else crosses the FFI.
- */
-public protocol NearIntentsProtocol: AnyObject, Sendable {
-    
-    /**
-     * Price a swap. `dry = true` previews; `false` reserves a deposit
-     * address the user must fund before the deadline.
-     */
-    func quote(req: IntentQuoteRequest) throws  -> IntentQuote
-    
-    /**
-     * Poll until terminal: `Success`, `Refunded`, or `Failed`.
-     */
-    func status(depositAddress: String) throws  -> IntentStatusReport
-    
-    /**
-     * Notify 1Click after funding the deposit address, to speed up
-     * detection. Returns the current execution state.
-     */
-    func submitDeposit(depositAddress: String, txHash: String) throws  -> IntentStatusReport
-    
-    /**
-     * Swappable assets. Unauthenticated upstream; the key stays home.
-     */
-    func tokens() throws  -> [IntentToken]
-    
-}
-/**
- * Blocking 1Click client. One method per call the box needs — nothing
- * else crosses the FFI.
- */
-open class NearIntents: NearIntentsProtocol, @unchecked Sendable {
-    fileprivate let handle: UInt64
-
-    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public struct NoHandle {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    required public init(unsafeFromHandle handle: UInt64) {
-        self.handle = handle
-    }
-
-    // This constructor can be used to instantiate a fake object.
-    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    //
-    // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public init(noHandle: NoHandle) {
-        self.handle = 0
-    }
-
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_runner_near_core_fn_clone_nearintents(self.handle, $0) }
-    }
-public convenience init(baseUrl: String, apiKey: String)throws  {
-    let handle =
-        try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_constructor_nearintents_new(
-        FfiConverterString.lower(baseUrl),
-        FfiConverterString.lower(apiKey),uniffiCallStatus
-    )
-}
-    self.init(unsafeFromHandle: handle)
-}
-
-    deinit {
-        if handle == 0 {
-            // Mock objects have handle=0 don't try to free them
-            return
-        }
-
-        try! rustCall { uniffi_runner_near_core_fn_free_nearintents(handle, $0) }
-    }
-
-    
-
-    
-    /**
-     * Price a swap. `dry = true` previews; `false` reserves a deposit
-     * address the user must fund before the deadline.
-     */
-open func quote(req: IntentQuoteRequest)throws  -> IntentQuote  {
-    return try  FfiConverterTypeIntentQuote_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearintents_quote(
-            self.uniffiCloneHandle(),
-        FfiConverterTypeIntentQuoteRequest_lower(req),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Poll until terminal: `Success`, `Refunded`, or `Failed`.
-     */
-open func status(depositAddress: String)throws  -> IntentStatusReport  {
-    return try  FfiConverterTypeIntentStatusReport_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearintents_status(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(depositAddress),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Notify 1Click after funding the deposit address, to speed up
-     * detection. Returns the current execution state.
-     */
-open func submitDeposit(depositAddress: String, txHash: String)throws  -> IntentStatusReport  {
-    return try  FfiConverterTypeIntentStatusReport_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearintents_submit_deposit(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(depositAddress),
-        FfiConverterString.lower(txHash),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Swappable assets. Unauthenticated upstream; the key stays home.
-     */
-open func tokens()throws  -> [IntentToken]  {
-    return try  FfiConverterSequenceTypeIntentToken.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
-        uniffiCallStatus in
-    uniffi_runner_near_core_fn_method_nearintents_tokens(
-            self.uniffiCloneHandle(),uniffiCallStatus
-    )
-})
-}
-    
-
-    
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeNearIntents: FfiConverter {
-    typealias FfiType = UInt64
-    typealias SwiftType = NearIntents
-
-    public static func lift(_ handle: UInt64) throws -> NearIntents {
-        return NearIntents(unsafeFromHandle: handle)
-    }
-
-    public static func lower(_ value: NearIntents) -> UInt64 {
-        return value.uniffiCloneHandle()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NearIntents {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
-    }
-
-    public static func write(_ value: NearIntents, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeNearIntents_lift(_ handle: UInt64) throws -> NearIntents {
-    return try FfiConverterTypeNearIntents.lift(handle)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeNearIntents_lower(_ value: NearIntents) -> UInt64 {
-    return FfiConverterTypeNearIntents.lower(value)
-}
-
-
-
-
-
-
-/**
  * Blocking JSON-RPC client. One method per call the box needs —
  * nothing else crosses the FFI.
  */
@@ -1220,6 +1020,7 @@ public func FfiConverterTypeEdKeypair_lower(_ value: EdKeypair) -> RustBuffer {
 
 public struct IntentQuote: Equatable, Hashable {
     public var depositAddress: String?
+    public var depositMemo: String?
     public var amountIn: String
     public var amountOut: String
     public var minAmountOut: String
@@ -1228,8 +1029,9 @@ public struct IntentQuote: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(depositAddress: String?, amountIn: String, amountOut: String, minAmountOut: String, deadline: String?, timeEstimateSecs: Double) {
+    public init(depositAddress: String?, depositMemo: String?, amountIn: String, amountOut: String, minAmountOut: String, deadline: String?, timeEstimateSecs: Double) {
         self.depositAddress = depositAddress
+        self.depositMemo = depositMemo
         self.amountIn = amountIn
         self.amountOut = amountOut
         self.minAmountOut = minAmountOut
@@ -1254,6 +1056,7 @@ public struct FfiConverterTypeIntentQuote: FfiConverterRustBuffer {
         return
             try IntentQuote(
                 depositAddress: FfiConverterOptionString.read(from: &buf), 
+                depositMemo: FfiConverterOptionString.read(from: &buf), 
                 amountIn: FfiConverterString.read(from: &buf), 
                 amountOut: FfiConverterString.read(from: &buf), 
                 minAmountOut: FfiConverterString.read(from: &buf), 
@@ -1264,6 +1067,7 @@ public struct FfiConverterTypeIntentQuote: FfiConverterRustBuffer {
 
     public static func write(_ value: IntentQuote, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.depositAddress, into: &buf)
+        FfiConverterOptionString.write(value.depositMemo, into: &buf)
         FfiConverterString.write(value.amountIn, into: &buf)
         FfiConverterString.write(value.amountOut, into: &buf)
         FfiConverterString.write(value.minAmountOut, into: &buf)
@@ -1289,8 +1093,8 @@ public func FfiConverterTypeIntentQuote_lower(_ value: IntentQuote) -> RustBuffe
 
 
 /**
- * Quote parameters. `dry = true` previews without a deposit address;
- * `dry = false` reserves one (≈10 min validity).
+ * Quote parameters. Enum-like fields carry the 1Click wire values
+ * (`EXACT_OUTPUT`, `ORIGIN_CHAIN`, ...) and are checked against the SDK.
  */
 public struct IntentQuoteRequest: Equatable, Hashable {
     public var dry: Bool
@@ -1305,10 +1109,17 @@ public struct IntentQuoteRequest: Equatable, Hashable {
     public var recipient: String
     public var recipientType: String
     public var deadline: String
+    /**
+     * `msg` for the `ft_transfer_call` that delivers to `recipient`.
+     */
+    public var customRecipientMsg: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(dry: Bool, swapType: String, slippageBps: UInt32, originAsset: String, depositType: String, destinationAsset: String, amount: String, refundTo: String, refundType: String, recipient: String, recipientType: String, deadline: String) {
+    public init(dry: Bool, swapType: String, slippageBps: UInt32, originAsset: String, depositType: String, destinationAsset: String, amount: String, refundTo: String, refundType: String, recipient: String, recipientType: String, deadline: String, 
+        /**
+         * `msg` for the `ft_transfer_call` that delivers to `recipient`.
+         */customRecipientMsg: String?) {
         self.dry = dry
         self.swapType = swapType
         self.slippageBps = slippageBps
@@ -1321,6 +1132,7 @@ public struct IntentQuoteRequest: Equatable, Hashable {
         self.recipient = recipient
         self.recipientType = recipientType
         self.deadline = deadline
+        self.customRecipientMsg = customRecipientMsg
     }
 
     
@@ -1350,7 +1162,8 @@ public struct FfiConverterTypeIntentQuoteRequest: FfiConverterRustBuffer {
                 refundType: FfiConverterString.read(from: &buf), 
                 recipient: FfiConverterString.read(from: &buf), 
                 recipientType: FfiConverterString.read(from: &buf), 
-                deadline: FfiConverterString.read(from: &buf)
+                deadline: FfiConverterString.read(from: &buf), 
+                customRecipientMsg: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1367,6 +1180,7 @@ public struct FfiConverterTypeIntentQuoteRequest: FfiConverterRustBuffer {
         FfiConverterString.write(value.recipient, into: &buf)
         FfiConverterString.write(value.recipientType, into: &buf)
         FfiConverterString.write(value.deadline, into: &buf)
+        FfiConverterOptionString.write(value.customRecipientMsg, into: &buf)
     }
 }
 
@@ -1383,126 +1197,6 @@ public func FfiConverterTypeIntentQuoteRequest_lift(_ buf: RustBuffer) throws ->
 #endif
 public func FfiConverterTypeIntentQuoteRequest_lower(_ value: IntentQuoteRequest) -> RustBuffer {
     return FfiConverterTypeIntentQuoteRequest.lower(value)
-}
-
-
-public struct IntentStatusReport: Equatable, Hashable {
-    public var status: IntentStatus
-    public var updatedAt: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(status: IntentStatus, updatedAt: String) {
-        self.status = status
-        self.updatedAt = updatedAt
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension IntentStatusReport: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeIntentStatusReport: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentStatusReport {
-        return
-            try IntentStatusReport(
-                status: FfiConverterTypeIntentStatus.read(from: &buf), 
-                updatedAt: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: IntentStatusReport, into buf: inout [UInt8]) {
-        FfiConverterTypeIntentStatus.write(value.status, into: &buf)
-        FfiConverterString.write(value.updatedAt, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentStatusReport_lift(_ buf: RustBuffer) throws -> IntentStatusReport {
-    return try FfiConverterTypeIntentStatusReport.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentStatusReport_lower(_ value: IntentStatusReport) -> RustBuffer {
-    return FfiConverterTypeIntentStatusReport.lower(value)
-}
-
-
-/**
- * One swappable asset, in UniFFI-safe shape. Amounts ride as decimal
- * strings everywhere else; only the static `decimals` count is numeric.
- */
-public struct IntentToken: Equatable, Hashable {
-    public var assetId: String
-    public var symbol: String
-    public var decimals: UInt32
-    public var blockchain: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(assetId: String, symbol: String, decimals: UInt32, blockchain: String) {
-        self.assetId = assetId
-        self.symbol = symbol
-        self.decimals = decimals
-        self.blockchain = blockchain
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension IntentToken: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeIntentToken: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentToken {
-        return
-            try IntentToken(
-                assetId: FfiConverterString.read(from: &buf), 
-                symbol: FfiConverterString.read(from: &buf), 
-                decimals: FfiConverterUInt32.read(from: &buf), 
-                blockchain: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: IntentToken, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.assetId, into: &buf)
-        FfiConverterString.write(value.symbol, into: &buf)
-        FfiConverterUInt32.write(value.decimals, into: &buf)
-        FfiConverterString.write(value.blockchain, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentToken_lift(_ buf: RustBuffer) throws -> IntentToken {
-    return try FfiConverterTypeIntentToken.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentToken_lower(_ value: IntentToken) -> RustBuffer {
-    return FfiConverterTypeIntentToken.lower(value)
 }
 
 
@@ -1678,111 +1372,6 @@ public func FfiConverterTypeCoreError_lower(_ value: CoreError) -> RustBuffer {
 
 
 /**
- * Terminal states included: poll until `Success`, `Refunded`, or `Failed`.
- * Byte-identical to the upstream `Status` renames.
- */
-
-public enum IntentStatus: Equatable, Hashable {
-    
-    case pendingDeposit
-    case knownDepositTx
-    case incompleteDeposit
-    case processing
-    case success
-    case refunded
-    case failed
-
-
-
-
-
-}
-
-#if compiler(>=6)
-extension IntentStatus: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeIntentStatus: FfiConverterRustBuffer {
-    typealias SwiftType = IntentStatus
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IntentStatus {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .pendingDeposit
-        
-        case 2: return .knownDepositTx
-        
-        case 3: return .incompleteDeposit
-        
-        case 4: return .processing
-        
-        case 5: return .success
-        
-        case 6: return .refunded
-        
-        case 7: return .failed
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: IntentStatus, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .pendingDeposit:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .knownDepositTx:
-            writeInt(&buf, Int32(2))
-        
-        
-        case .incompleteDeposit:
-            writeInt(&buf, Int32(3))
-        
-        
-        case .processing:
-            writeInt(&buf, Int32(4))
-        
-        
-        case .success:
-            writeInt(&buf, Int32(5))
-        
-        
-        case .refunded:
-            writeInt(&buf, Int32(6))
-        
-        
-        case .failed:
-            writeInt(&buf, Int32(7))
-        
-        }
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentStatus_lift(_ buf: RustBuffer) throws -> IntentStatus {
-    return try FfiConverterTypeIntentStatus.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeIntentStatus_lower(_ value: IntentStatus) -> RustBuffer {
-    return FfiConverterTypeIntentStatus.lower(value)
-}
-
-
-
-/**
  * One unsigned transaction's action, in UniFFI-safe shape.
  * Yocto amounts ride as decimal strings — never floats.
  */
@@ -1881,31 +1470,6 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
         case 1: return try FfiConverterString.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterSequenceTypeIntentToken: FfiConverterRustBuffer {
-    typealias SwiftType = [IntentToken]
-
-    public static func write(_ value: [IntentToken], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeIntentToken.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [IntentToken] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [IntentToken]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeIntentToken.read(from: &buf))
-        }
-        return seq
     }
 }
 public func ed25519Keypair()throws  -> EdKeypair  {
@@ -2045,6 +1609,22 @@ public func txSigningHash(unsignedB64: String)throws  -> String  {
     )
 })
 }
+public func decodeIntentQuote(body: Data)throws  -> IntentQuote  {
+    return try  FfiConverterTypeIntentQuote_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_runner_near_core_fn_func_decode_intent_quote(
+        FfiConverterData.lower(body),uniffiCallStatus
+    )
+})
+}
+public func encodeIntentQuote(req: IntentQuoteRequest)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_runner_near_core_fn_func_encode_intent_quote(
+        FfiConverterTypeIntentQuoteRequest_lower(req),uniffiCallStatus
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -2094,6 +1674,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_runner_near_core_checksum_func_tx_signing_hash() != 13120) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_runner_near_core_checksum_func_decode_intent_quote() != 11668) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_runner_near_core_checksum_func_encode_intent_quote() != 37935) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_runner_near_core_checksum_method_nearrpc_access_key() != 24695) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2112,22 +1698,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_runner_near_core_checksum_method_nearrpc_view_call() != 58802) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_runner_near_core_checksum_method_nearintents_quote() != 65240) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearintents_status() != 28491) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearintents_submit_deposit() != 29535) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_method_nearintents_tokens() != 45959) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_runner_near_core_checksum_constructor_nearrpc_new() != 37047) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_runner_near_core_checksum_constructor_nearintents_new() != 44686) {
         return InitializationResult.apiChecksumMismatch
     }
 

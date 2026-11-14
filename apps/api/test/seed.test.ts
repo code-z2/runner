@@ -183,7 +183,7 @@ describe("seeding", () => {
     expect(rpc.sent.length).toBe(5);
   });
 
-  test("the claim path seeds before attesting", async () => {
+  test("the proof path authenticates an implicit key without seeding before the first transaction", async () => {
     const secret = ed25519.utils.randomSecretKey();
     const accountId = toHex(ed25519.getPublicKey(secret));
     const { challenge } = (await (await call(env, "POST", "/v1/challenge")).json()) as { challenge: string };
@@ -202,7 +202,7 @@ describe("seeding", () => {
       near_public_key: `ed25519:${base58.encode(ed25519.getPublicKey(secret))}`,
       near_signature: toBase64(ed25519.sign(nep413Digest(payload, nonce, "runner-api"), secret)),
     });
-    expect(rpc.sent.length).toBe(1);
+    expect(rpc.sent.length).toBe(0);
     expect(response.status).toBe(201);
   });
 });

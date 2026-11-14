@@ -27,6 +27,8 @@ public struct SessionSnapshotModel: Sendable, Equatable, Codable {
 
   public let distanceMeters: Double?
 
+  public let splits: [Double]?
+
   public let finishReason: FinishReason?
 
   public let pauses: [DateInterval]?
@@ -40,6 +42,7 @@ public struct SessionSnapshotModel: Sendable, Equatable, Codable {
     batteryLevel: Float?,
     checkpointAtWall: Date,
     distanceMeters: Double? = nil,
+    splits: [Double]? = nil,
     finishReason: FinishReason? = nil,
     pauses: [DateInterval]? = nil
   ) {
@@ -51,6 +54,7 @@ public struct SessionSnapshotModel: Sendable, Equatable, Codable {
     self.batteryLevel = batteryLevel
     self.checkpointAtWall = checkpointAtWall
     self.distanceMeters = distanceMeters
+    self.splits = splits
     self.finishReason = finishReason
     self.pauses = pauses
   }

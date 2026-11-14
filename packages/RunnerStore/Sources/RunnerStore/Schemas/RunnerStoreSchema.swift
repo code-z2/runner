@@ -115,7 +115,70 @@ public enum RunnerStoreSchemaV2: VersionedSchema {
 
 public enum RunnerStoreSchemaV3: VersionedSchema {
 
+  @Model
+  final class RunRecordModel {
+
+    @Attribute(.unique)
+    var runID: UUID
+
+    var startedAt: Date
+
+    var activeElapsed: TimeInterval
+
+    var distanceMeters: Double?
+
+    var finishReasonRaw: String
+
+    var batteryLevelAtStart: Float?
+
+    var batteryLevelAtEnd: Float?
+
+    var recordedAt: Date
+
+    var cadenceStepsPerMinute: Int?
+
+    var newEncounters: Int?
+
+    var repeatEncounters: Int?
+
+    var togetherEncounters: Int?
+
+    init(
+      runID: UUID,
+      startedAt: Date,
+      activeElapsed: TimeInterval,
+      distanceMeters: Double?,
+      finishReasonRaw: String,
+      batteryLevelAtStart: Float?,
+      batteryLevelAtEnd: Float?,
+      cadenceStepsPerMinute: Int? = nil,
+      encounters: RunEncounterCounts? = nil,
+      recordedAt: Date
+    ) {
+      self.runID = runID
+      self.startedAt = startedAt
+      self.activeElapsed = activeElapsed
+      self.distanceMeters = distanceMeters
+      self.finishReasonRaw = finishReasonRaw
+      self.batteryLevelAtStart = batteryLevelAtStart
+      self.batteryLevelAtEnd = batteryLevelAtEnd
+      self.cadenceStepsPerMinute = cadenceStepsPerMinute
+      newEncounters = encounters?.new
+      repeatEncounters = encounters?.again
+      togetherEncounters = encounters?.together
+      self.recordedAt = recordedAt
+    }
+  }
+
   public static let versionIdentifier = Schema.Version(3, 0, 0)
+
+  public static var models: [any PersistentModel.Type] {
+    [RunRecordModel.self]
+  }
+}
+
+public enum RunnerStoreSchemaV4: VersionedSchema {
+  public static let versionIdentifier = Schema.Version(4, 0, 0)
 
   public static var models: [any PersistentModel.Type] {
     [RunRecordModel.self]
@@ -125,13 +188,17 @@ public enum RunnerStoreSchemaV3: VersionedSchema {
 public enum RunnerStoreMigrationPlan: SchemaMigrationPlan {
 
   public static var schemas: [any VersionedSchema.Type] {
-    [RunnerStoreSchemaV1.self, RunnerStoreSchemaV2.self, RunnerStoreSchemaV3.self]
+    [
+      RunnerStoreSchemaV1.self, RunnerStoreSchemaV2.self, RunnerStoreSchemaV3.self,
+      RunnerStoreSchemaV4.self,
+    ]
   }
 
   public static var stages: [MigrationStage] {
     [
       .lightweight(fromVersion: RunnerStoreSchemaV1.self, toVersion: RunnerStoreSchemaV2.self),
       .lightweight(fromVersion: RunnerStoreSchemaV2.self, toVersion: RunnerStoreSchemaV3.self),
+      .lightweight(fromVersion: RunnerStoreSchemaV3.self, toVersion: RunnerStoreSchemaV4.self),
     ]
   }
 }

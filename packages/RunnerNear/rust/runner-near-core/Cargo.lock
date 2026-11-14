@@ -1360,7 +1360,7 @@ dependencies = [
  "near-openapi-client",
  "near-slip10",
  "openssl",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_dbgfmt",
  "serde_json",
@@ -1416,7 +1416,7 @@ dependencies = [
  "futures-core",
  "near-openapi-types",
  "progenitor-client",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -1492,11 +1492,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "one-click-sdk-rs"
-version = "0.1.17"
+name = "oneclick"
+version = "0.1.10"
 source = "git+https://github.com/defuse-protocol/one-click-sdk-rs.git?rev=f9741c3dcfe406dba2ce8c2ae73a6e025dbaafd9#f9741c3dcfe406dba2ce8c2ae73a6e025dbaafd9"
 dependencies = [
- "reqwest",
+ "reqwest 0.13.5",
  "serde",
  "serde_json",
  "serde_repr",
@@ -1672,7 +1672,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "percent-encoding",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -1848,7 +1848,6 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
- "mime_guess",
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
@@ -1875,6 +1874,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
+dependencies = [
+ "base64 0.23.1",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "js-sys",
+ "log",
+ "mime_guess",
+ "percent-encoding",
+ "pin-project-lite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sync_wrapper",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tower-service",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1898,9 +1931,9 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "near-api",
- "one-click-sdk-rs",
+ "oneclick",
  "rand_core 0.6.4",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.10.9",

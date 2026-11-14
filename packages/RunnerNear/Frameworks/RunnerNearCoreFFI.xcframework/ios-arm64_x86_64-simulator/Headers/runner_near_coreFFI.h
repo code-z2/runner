@@ -288,41 +288,6 @@ RustBuffer uniffi_runner_near_core_fn_method_nearrpc_submit_sign_call(uint64_t p
 RustBuffer uniffi_runner_near_core_fn_method_nearrpc_view_call(uint64_t ptr, RustBuffer contract_id, RustBuffer method, RustBuffer args_json, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_CLONE_NEARINTENTS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_CLONE_NEARINTENTS
-uint64_t uniffi_runner_near_core_fn_clone_nearintents(uint64_t handle, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FREE_NEARINTENTS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FREE_NEARINTENTS
-void uniffi_runner_near_core_fn_free_nearintents(uint64_t handle, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_CONSTRUCTOR_NEARINTENTS_NEW
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_CONSTRUCTOR_NEARINTENTS_NEW
-uint64_t uniffi_runner_near_core_fn_constructor_nearintents_new(RustBuffer base_url, RustBuffer api_key, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_QUOTE
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_QUOTE
-RustBuffer uniffi_runner_near_core_fn_method_nearintents_quote(uint64_t ptr, RustBuffer req, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_STATUS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_STATUS
-RustBuffer uniffi_runner_near_core_fn_method_nearintents_status(uint64_t ptr, RustBuffer deposit_address, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_SUBMIT_DEPOSIT
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_SUBMIT_DEPOSIT
-RustBuffer uniffi_runner_near_core_fn_method_nearintents_submit_deposit(uint64_t ptr, RustBuffer deposit_address, RustBuffer tx_hash, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_TOKENS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_METHOD_NEARINTENTS_TOKENS
-RustBuffer uniffi_runner_near_core_fn_method_nearintents_tokens(uint64_t ptr, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ED25519_KEYPAIR
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ED25519_KEYPAIR
 RustBuffer uniffi_runner_near_core_fn_func_ed25519_keypair(RustCallStatus *_Nonnull out_status
@@ -377,6 +342,16 @@ RustBuffer uniffi_runner_near_core_fn_func_nep366_digest_hex(RustBuffer delegate
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_TX_SIGNING_HASH
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_TX_SIGNING_HASH
 RustBuffer uniffi_runner_near_core_fn_func_tx_signing_hash(RustBuffer unsigned_b64, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_DECODE_INTENT_QUOTE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_DECODE_INTENT_QUOTE
+RustBuffer uniffi_runner_near_core_fn_func_decode_intent_quote(RustBuffer body, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_INTENT_QUOTE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_FN_FUNC_ENCODE_INTENT_QUOTE
+RustBuffer uniffi_runner_near_core_fn_func_encode_intent_quote(RustBuffer req, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_RUNNER_NEAR_CORE_RUSTBUFFER_ALLOC
@@ -705,6 +680,18 @@ uint16_t uniffi_runner_near_core_checksum_func_tx_signing_hash(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_DECODE_INTENT_QUOTE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_DECODE_INTENT_QUOTE
+uint16_t uniffi_runner_near_core_checksum_func_decode_intent_quote(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_INTENT_QUOTE
+#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_FUNC_ENCODE_INTENT_QUOTE
+uint16_t uniffi_runner_near_core_checksum_func_encode_intent_quote(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARRPC_ACCESS_KEY
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARRPC_ACCESS_KEY
 uint16_t uniffi_runner_near_core_checksum_method_nearrpc_access_key(void
@@ -741,39 +728,9 @@ uint16_t uniffi_runner_near_core_checksum_method_nearrpc_view_call(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_QUOTE
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_QUOTE
-uint16_t uniffi_runner_near_core_checksum_method_nearintents_quote(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_STATUS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_STATUS
-uint16_t uniffi_runner_near_core_checksum_method_nearintents_status(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_SUBMIT_DEPOSIT
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_SUBMIT_DEPOSIT
-uint16_t uniffi_runner_near_core_checksum_method_nearintents_submit_deposit(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_TOKENS
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_METHOD_NEARINTENTS_TOKENS
-uint16_t uniffi_runner_near_core_checksum_method_nearintents_tokens(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_CONSTRUCTOR_NEARRPC_NEW
 #define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_CONSTRUCTOR_NEARRPC_NEW
 uint16_t uniffi_runner_near_core_checksum_constructor_nearrpc_new(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_CONSTRUCTOR_NEARINTENTS_NEW
-#define UNIFFI_FFIDEF_UNIFFI_RUNNER_NEAR_CORE_CHECKSUM_CONSTRUCTOR_NEARINTENTS_NEW
-uint16_t uniffi_runner_near_core_checksum_constructor_nearintents_new(void
     
 );
 #endif

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+  private let goalService: GoalService?
 
   @Environment(\.scenePhase)
   private var scenePhase
@@ -15,12 +16,14 @@ struct RootView: View {
 
   init(app: AppModel, navigation: RootNavigation) {
     self.navigation = navigation
+    goalService = app.goals
     _viewModels = State(initialValue: AppViewModels(app: app, navigation: navigation))
   }
 
   var body: some View {
     HomeView(
-      run: viewModels.run, live: viewModels.live, weatherModel: viewModels.weather,
+      run: viewModels.run, live: viewModels.live, goalService: goalService,
+      weatherModel: viewModels.weather,
       navigation: homeNavigation
     )
     .accessibilityHidden(navigation.route == .launch)
@@ -38,6 +41,7 @@ struct RootView: View {
       }
       await viewModels.run.refreshHistory()
       await viewModels.weather.refresh()
+      await viewModels.checkGoalRun()
     }
     .overlay {
       if navigation.route == .launch {

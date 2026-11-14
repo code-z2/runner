@@ -19,6 +19,8 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
   public let expiresAt: Int
   public let nonce: String
   public let signature: String
+  public let runProof: String?
+  public let runProofSignature: String?
 
   public init(
     version: Int,
@@ -27,7 +29,9 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
     maxAmountCents: Int,
     expiresAt: Int,
     nonce: String,
-    signature: String
+    signature: String,
+    runProof: String? = nil,
+    runProofSignature: String? = nil
   ) {
     self.version = version
     self.accountID = accountID
@@ -36,6 +40,8 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
     self.expiresAt = expiresAt
     self.nonce = nonce
     self.signature = signature
+    self.runProof = runProof
+    self.runProofSignature = runProofSignature
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -59,13 +65,17 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
       maxAmountCents: inner.maxAmountCents,
       expiresAt: inner.expiresAt,
       nonce: inner.nonce,
-      signature: signature
+      signature: signature,
+      runProof: try envelope.decodeIfPresent(String.self, forKey: .runProof),
+      runProofSignature: try envelope.decodeIfPresent(String.self, forKey: .runProofSignature)
     )
   }
 
   private enum EnvelopeKeys: String, CodingKey {
     case attestation
     case signature
+    case runProof = "run_proof"
+    case runProofSignature = "run_proof_signature"
   }
 
   private struct Inner: Decodable {

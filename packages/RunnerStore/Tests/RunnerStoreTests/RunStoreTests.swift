@@ -71,7 +71,7 @@ struct RunStoreTests {
           batteryLevelAtStart: nil, batteryLevelAtEnd: nil, recordedAt: .now))
       try context.save()
     }
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV4.self)
     let container = try ModelContainer(
       for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
     let store = RunStore(modelContainer: container)
@@ -108,7 +108,7 @@ struct RunStoreTests {
           recordedAt: .now))
       try context.save()
     }
-    let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV4.self)
     let container = try ModelContainer(
       for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
     let store = RunStore(modelContainer: container)
@@ -119,15 +119,48 @@ struct RunStoreTests {
   }
 
   @Test
+  func versionThreeHistoryKeepsEncountersWhenSplitsAreAdded() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let configuration = ModelConfiguration(url: directory.appending(path: "runner.store"))
+    let (run, distance) = finishedRun()
+    let encounters = RunEncounterCounts(new: 3, again: 1, together: 1)
+    do {
+      let schema = Schema(versionedSchema: RunnerStoreSchemaV3.self)
+      let container = try ModelContainer(for: schema, configurations: [configuration])
+      let context = ModelContext(container)
+      context.insert(
+        RunnerStoreSchemaV3.RunRecordModel(
+          runID: run.id, startedAt: run.startedAtWall, activeElapsed: run.activeElapsed,
+          distanceMeters: distance, finishReasonRaw: "userFinished",
+          batteryLevelAtStart: nil, batteryLevelAtEnd: nil, cadenceStepsPerMinute: 158,
+          encounters: encounters, recordedAt: .now))
+      try context.save()
+    }
+    let schema = Schema(versionedSchema: RunnerStoreSchemaV4.self)
+    let container = try ModelContainer(
+      for: schema, migrationPlan: RunnerStoreMigrationPlan.self, configurations: [configuration])
+    let saved = try #require(try await RunStore(modelContainer: container).recentRuns().first)
+    #expect(saved.id == run.id)
+    #expect(saved.cadenceStepsPerMinute == 158)
+    #expect(saved.encounters == encounters)
+    #expect(saved.splits.isEmpty)
+  }
+
+  @Test
   func recordPersistsAndReturnsSnapshot() async throws {
     let store = try TestStoreFactory.makeStore()
     let (run, distance) = finishedRun(elapsed: 90, distanceMeters: 3_000)
 
-    let snapshot = try await store.record(run, distanceMeters: distance)
+    let splits: [TimeInterval] = [28, 31, 31]
+    let snapshot = try await store.record(run, distanceMeters: distance, splits: splits)
 
     #expect(snapshot.id == run.id)
     #expect(snapshot.activeElapsed == 90)
     #expect(snapshot.distanceMeters == 3_000)
+    #expect(snapshot.splits == splits)
+    #expect(try await store.recentRuns().first?.splits == splits)
     #expect(snapshot.finishReason == String(describing: FinishReason.userFinished))
   }
 

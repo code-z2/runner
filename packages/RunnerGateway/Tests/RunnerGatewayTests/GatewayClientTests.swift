@@ -268,4 +268,44 @@ struct GatewayClientTests {
     #expect(result.status == .failed)
     #expect(result.transactionHash == "9abcdef")
   }
+
+  private let signed = ClaimPassRequest(
+    payload: "{}", keyID: "key-1", assertion: "a", nearPublicKey: "ed25519:x", nearSignature: "s")
+
+  @Test
+  func goalsDecodeLockedGoals() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    let id = UUID()
+    await transport.enqueue(
+      try json([
+        "goals": [
+          [
+            "id": id.uuidString.lowercased(), "state": "locked", "distance_m": 5000,
+            "max_seconds": NSNull(), "amount": "4990000", "origin_asset": "nep141:base-usdc",
+            "return_address": "0x1", "lock_id": "7", "locked_at": 1_800_000_000,
+          ]
+        ]
+      ]))
+    let goals = try await client.goals(signed)
+    #expect(
+      goals == [
+        GoalRecord(
+          id: id, state: "locked", distanceM: 5000, maxSeconds: nil, amount: "4990000",
+          originAsset: "nep141:base-usdc", returnAddress: "0x1", lockID: "7",
+          lockedAt: 1_800_000_000)
+      ])
+    #expect(await transport.lastRequest?.url?.path == "/v1/goals/list")
+  }
+
+  @Test
+  func withdrawGoalDecodesTheReservedPayout() async throws {
+    let transport = MockHTTPTransport()
+    let (client, _) = try self.client(transport: transport)
+    await transport.enqueue(try json(["receiver_id": "dep.near", "amount": "4990000"]))
+    let payout = try await client.withdrawGoal(signed)
+    #expect(payout.receiverID == "dep.near")
+    #expect(payout.amount == "4990000")
+    #expect(await transport.lastRequest?.url?.path == "/v1/goals/withdraw")
+  }
 }

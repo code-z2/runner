@@ -33,6 +33,9 @@
       "path": "../../packages/RunnerEncounters",
     }, {
       "kind": "local",
+      "path": "../../packages/RunnerEscrow",
+    }, {
+      "kind": "local",
       "path": "../../packages/RunnerPacePilot",
     }, {
       "kind": "local",
@@ -72,6 +75,16 @@
         { "path": "IjeIcon.icon", "target-membership": [ "Runner/resources" ] },
         { "path": "Assets.xcassets", "target-membership": [ "Runner/resources" ] },
         { "path": "LaunchScreen.storyboard", "target-membership": [ "Runner/resources" ] },
+        { "path": "Features/Goals/Model/GoalDraft.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/Service/GoalService.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/Service/GoalAccount.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/Service/GoalEvidence.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/ViewModel/GoalsViewModel.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/View/Pages/GoalsPage.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/View/Pages/LockGoalPage.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Features/Goals/View/Pages/GoalFundingPage.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Shared/Funding/IntentDepositSheet.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Shared/Funding/IntentQuoteCard.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Community/View/Pages/CommunityPage.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Coach/Service/CoachAudioPlayback.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/Coach/Service/KokoroCueRenderer.swift", "target-membership": [ "Runner/compile-sources" ] },
@@ -91,10 +104,10 @@
         { "path": "Features/RunHistory/View/Sections/RunBestTile.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunHistory/View/Sections/RunPersonalBests.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunReady/Enum/RunDistance.swift", "target-membership": [ "Runner/compile-sources" ] },
-        { "path": "Features/RunReady/Enum/RunDistanceUnit.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Shared/Distance/DistanceUnit.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunReady/Model/RunSummary.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunReady/Model/RunWeather.swift", "target-membership": [ "Runner/compile-sources" ] },
-        { "path": "Features/RunReady/View/Pages/RunDistanceSheet.swift", "target-membership": [ "Runner/compile-sources" ] },
+        { "path": "Shared/Distance/DistanceSheet.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunCountdown/View/Pages/RunCountdownPage.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunSummary/View/Pages/RunSummaryPage.swift", "target-membership": [ "Runner/compile-sources" ] },
         { "path": "Features/RunSummary/Model/RunEncounters.swift", "target-membership": [ "Runner/compile-sources" ] },
@@ -291,6 +304,10 @@
         }, {
           "package": "RunnerEncounters",
           "product-name": "RunnerEncounters",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "RunnerEscrow",
+          "product-name": "RunnerEscrow",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "RunnerGateway",

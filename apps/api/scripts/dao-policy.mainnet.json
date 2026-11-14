@@ -1,0 +1,94 @@
+{
+  "bounty_bond": "100000000000000000000000",
+  "bounty_forgiveness_period": "86400000000000",
+  "default_vote_policy": {
+    "quorum": "1",
+    "threshold": [1, 2],
+    "weight_kind": "RoleWeight"
+  },
+  "proposal_bond": "100000000000000000000000",
+  "proposal_period": "604800000000000",
+  "roles": [
+    {
+      "kind": { "Group": ["codez2.near", "ije-joel.near"] },
+      "name": "council",
+      "permissions": [
+        "add_member_to_role:VoteRemove",
+        "call:AddProposal",
+        "call:VoteRemove",
+        "policy:VoteRemove",
+        "remove_member_from_role:VoteRemove",
+        "*:Finalize",
+        "call:VoteApprove"
+      ],
+      "vote_policy": {
+        "add_member_to_role": {
+          "quorum": "2",
+          "threshold": [2, 2],
+          "weight_kind": "RoleWeight"
+        },
+        "call": {
+          "quorum": "2",
+          "threshold": [2, 2],
+          "weight_kind": "RoleWeight"
+        },
+        "policy": {
+          "quorum": "2",
+          "threshold": [2, 2],
+          "weight_kind": "RoleWeight"
+        },
+        "remove_member_from_role": {
+          "quorum": "2",
+          "threshold": [2, 2],
+          "weight_kind": "RoleWeight"
+        }
+      }
+    },
+    {
+      "kind": { "Group": [] },
+      "name": "community",
+      "permissions": [
+        "call:AddProposal",
+        "call:VoteApprove",
+        "call:VoteRemove",
+        "policy:AddProposal",
+        "policy:VoteApprove",
+        "policy:VoteRemove"
+      ],
+      "vote_policy": {
+        "call": {
+          "quorum": "3",
+          "threshold": "3",
+          "weight_kind": "RoleWeight"
+        },
+        "policy": {
+          "quorum": "3",
+          "threshold": "3",
+          "weight_kind": "RoleWeight"
+        }
+      }
+    },
+    {
+      "kind": { "Group": ["ije-v1-claims.codez2.near"] },
+      "name": "claims",
+      "permissions": [
+        "transfer:AddProposal",
+        "add_member_to_role:AddProposal",
+        "add_member_to_role:VoteApprove",
+        "transfer:VoteApprove"
+      ],
+      "vote_policy": {
+        "add_member_to_role": {
+          "quorum": "0",
+          "threshold": [1, 1],
+          "weight_kind": "RoleWeight"
+        },
+        "transfer": {
+          "quorum": "0",
+          "threshold": [1, 1],
+          "weight_kind": "RoleWeight"
+        }
+      }
+    }
+  ]
+}

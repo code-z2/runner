@@ -17,6 +17,7 @@ export interface Env {
   MAIL_FROM: string;
   ATTESTOR_SECRET_KEY: string;
   RESEND_API_KEY: string;
+  ONE_CLICK_API_KEY?: string;
 }
 
 export type Setting = keyof Omit<Env, "DB">;

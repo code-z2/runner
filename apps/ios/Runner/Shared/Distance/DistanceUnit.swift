@@ -1,6 +1,6 @@
 import Foundation
 
-enum RunDistanceUnit: String, CaseIterable {
+enum DistanceUnit: String, CaseIterable {
   case kilometers = "km"
   case miles = "mi"
 

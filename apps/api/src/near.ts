@@ -127,6 +127,7 @@ export async function rpcCall(rpcUrl: string, method: string, params: unknown): 
     throw new HttpError(502, "near_rpc_unavailable");
   }
   if (!response.ok && response.status !== 400) {
+    console.error(`NEAR RPC ${method} returned HTTP ${response.status}`);
     throw new HttpError(502, "near_rpc_unavailable");
   }
   return (await response.json()) as { result?: Record<string, unknown>; error?: Record<string, unknown> };
