@@ -340,6 +340,32 @@ fn deposit_with_owner_in_message_attributes_the_named_account() {
 }
 
 #[test]
+fn funding_receipt_links_the_goal_to_the_created_lock() {
+    let mut escrow = setup();
+    set_caller("usdc.near", LOCKED_AT_S, 0);
+    let funding_id = "b58594bc-139f-4281-83c0-ca02f803c639";
+    let msg = serde_json::json!({
+        "owner": "runner.ije.near",
+        "goal": { "distance_m": 10000, "max_seconds": 3300 },
+        "funding_id": funding_id,
+    });
+    let result = escrow.ft_on_transfer(account("solver.1click.near"), U128(25 * USDC), msg.to_string());
+    assert!(matches!(result, PromiseOrValue::Value(U128(0))));
+    let lock = &escrow.get_locks(account("runner.ije.near"))[0];
+    let logs = near_sdk::test_utils::get_logs();
+    let event: serde_json::Value = serde_json::from_str(logs[0].strip_prefix("EVENT_JSON:").unwrap()).unwrap();
+    assert_eq!(event["event"], "goal_funded");
+    assert_eq!(event["data"][0], serde_json::json!({
+        "funding_id": funding_id,
+        "lock_id": lock.id,
+        "owner": lock.owner_id,
+        "amount": lock.amount,
+        "created_at": lock.created_at,
+        "goal": lock.goal,
+    }));
+}
+
+#[test]
 fn skew_band_accepts_just_below_minimum_and_rejects_below_the_band() {
     // Default skew is 500 bps: floor for a 1 USDC minimum is 0.95 USDC.
     let mut escrow = setup();

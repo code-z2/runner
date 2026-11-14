@@ -41,6 +41,7 @@ pub struct Goal {
 struct DepositMsg {
     owner: AccountId,
     goal: Goal,
+    funding_id: Option<String>,
 }
 
 #[near(serializers = [borsh])]
@@ -178,17 +179,40 @@ impl Escrow {
         }
         // Owner-attributed deposit (intent solvers delivering for a user)
         // first, bare Goal with owner = sender (relay path) second.
-        let (owner_id, goal) = match serde_json::from_str::<DepositMsg>(&msg) {
-            Ok(deposit) => (deposit.owner, deposit.goal),
+        let (owner_id, goal, funding_id) = match serde_json::from_str::<DepositMsg>(&msg) {
+            Ok(deposit) => (deposit.owner, deposit.goal, deposit.funding_id),
             Err(_) => match serde_json::from_str::<Goal>(&msg) {
-                Ok(goal) => (sender_id, goal),
+                Ok(goal) => (sender_id.clone(), goal, None),
                 Err(_) => return PromiseOrValue::Value(amount),
             },
         };
         if !goal_is_valid(&goal) {
             return PromiseOrValue::Value(amount);
         }
-        self.create_lock(owner_id, amount.0, goal);
+        if funding_id.as_ref().is_some_and(|id| {
+            id.len() != 36 || !id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+        }) {
+            return PromiseOrValue::Value(amount);
+        }
+        let id = self.create_lock(owner_id.clone(), amount.0, goal.clone());
+        if let Some(funding_id) = funding_id {
+            env::log_str(&format!(
+                "EVENT_JSON:{}",
+                serde_json::json!({
+                    "standard": "runner_escrow",
+                    "version": "1.0.0",
+                    "event": "goal_funded",
+                    "data": [{
+                        "funding_id": funding_id,
+                        "lock_id": U64(id),
+                        "owner": owner_id,
+                        "amount": amount,
+                        "created_at": U64(env::block_timestamp()),
+                        "goal": goal
+                    }],
+                })
+            ));
+        }
         PromiseOrValue::Value(U128(0))
     }
 
