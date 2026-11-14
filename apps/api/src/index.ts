@@ -10,6 +10,8 @@ import {
   updateLocation,
 } from "./routes/merchant";
 import { relay } from "./routes/relay";
+import { listGoals, withdrawGoal } from "./routes/goals";
+import { proxyIntent } from "./routes/intents";
 import { createAttestation, createChallenge, listMerchants, registerDevice } from "./routes/runner";
 import { seedAccount } from "./routes/seed";
 
@@ -37,6 +39,9 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   if (method === "GET" && pathname === "/v1/merchants") return listMerchants(url, env);
   if (method === "POST" && pathname === "/v1/relay") return relay(request, env);
   if (method === "POST" && pathname === "/v1/seed") return seedAccount(request, env);
+  if (pathname.startsWith("/v1/intents/")) return proxyIntent(request, env, url);
+  if (method === "POST" && pathname === "/v1/goals/list") return listGoals(request, env);
+  if (method === "POST" && pathname === "/v1/goals/withdraw") return withdrawGoal(request, env);
 
   if (method === "POST" && pathname === "/v1/merchant/login") return requestLogin(request, env);
   if (method === "POST" && pathname === "/v1/merchant/session") return createSession(request, env);

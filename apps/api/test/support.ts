@@ -35,7 +35,7 @@ class Statement {
 
 export function createDatabase(): D1Database {
   const db = new Database(":memory:");
-  for (const file of ["0001_init.sql", "0002_relay_log.sql", "0003_seed_log.sql"]) {
+  for (const file of ["0001_init.sql", "0002_relay_log.sql", "0003_seed_log.sql", "0004_goals.sql", "0005_goal_quotes.sql"]) {
     db.exec(readFileSync(join(import.meta.dir, "..", "migrations", file), "utf8"));
   }
   return {
@@ -43,10 +43,15 @@ export function createDatabase(): D1Database {
     batch: async (statements: Statement[]) => {
       const results = [];
       db.exec("BEGIN");
-      for (const statement of statements) {
-        results.push(await statement.run());
+      try {
+        for (const statement of statements) {
+          results.push(await statement.run());
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
       }
-      db.exec("COMMIT");
       return results;
     },
   } as unknown as D1Database;
