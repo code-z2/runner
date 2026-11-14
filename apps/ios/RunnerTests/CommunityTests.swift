@@ -94,6 +94,16 @@ struct CommunityTests {
     #expect(CommunityFundingPage.minimum(in: "other_error") == nil)
   }
 
+  @Test
+  func goalDepositShowsTheSourceChainAndDecimals() {
+    let quote = IntentQuote(
+      depositAddress: "0xdep", amountIn: "25080000000000000000", amountOut: "25000000",
+      minAmountOut: "25000000", deadline: "2099-01-01T00:00:00Z", timeEstimateSecs: 10)
+    let deposit = GoalOverview.Deposit(id: UUID(), goal: GoalDraft(), network: .bnb, quote: quote)
+    #expect(deposit?.amount == "25.08")
+    #expect(deposit?.network == "BNB Chain")
+  }
+
   private static func pass(expiresAt: Int) -> RunPass {
     RunPass(
       runID: UUID(), attestation: #"{"v":1}"#, signature: "sig", nonce: "n", maxAmountCents: 256,

@@ -10,7 +10,7 @@ struct GoalFundingPage: View {
   var onReturnToGoals: () -> Void = {}
   var onConfirmSample: (() -> Void)?
 
-  @State private var chain = Chain.base
+  @State private var chain = FundingNetwork.base
   @State private var returnAddress = ""
   @State private var addressInput = ""
   @State private var editingReturnAddress = false
@@ -25,14 +25,14 @@ struct GoalFundingPage: View {
 
     var id: Self { self }
 
-    var message: LocalizedStringKey {
+    func message(network: String) -> LocalizedStringKey {
       switch self {
       case .unavailable:
         "Goal funding is temporarily paused."
       case .invalidDraft:
         "Use a goal from 1 to 100 km and an amount of at least $5."
       case .invalidAddress:
-        "Enter a valid Base wallet address for USDC."
+        "Enter a valid \(network) wallet address for USDC."
       case .quoteFailed:
         "We couldn’t confirm your quote. Retry to check the same request."
       }
@@ -43,35 +43,8 @@ struct GoalFundingPage: View {
 
   private static let maxUSD = Decimal(99_999_999) / 100
 
-  private enum Chain: String {
-    case base = "Base"
-    case ethereum = "Ethereum"
-    case solana = "Solana"
-    case bitcoin = "Bitcoin"
-    case near = "NEAR"
-    case arbitrum = "Arbitrum"
-
-    var asset: String { self == .bitcoin ? "BTC" : "USDC" }
-
-    var returnAddressKey: String { "funding.lastReturnAddress.\(rawValue.lowercased())" }
-
-    var sampleDepositAddress: String {
-      switch self {
-      case .base, .ethereum, .arbitrum:
-        "0x71c4b9a0e83dPREVIEWa5526f0c92c7a41e09d"
-      case .solana: "8N4uVb3WqP7mZk1SAMPLE8xQ5dHt4pY6"
-      case .bitcoin: "bc1qpreview0k60ja5c47e0pxv2s4haj7y"
-      case .near: "runner-deposit.example"
-      }
-    }
-  }
-
   private var sourceAmount: String {
-    if chain == .bitcoin {
-      // Illustrative rate for the sample quote only.
-      return (draft.amount / 100_000).formatted(.number.precision(.fractionLength(0...8)))
-    }
-    return draft.amount.formatted(.number.precision(.fractionLength(0...2)))
+    draft.amount.formatted(.number.precision(.fractionLength(0...2)))
   }
 
   var body: some View {
@@ -95,18 +68,14 @@ struct GoalFundingPage: View {
             .runnerText(.eyebrow)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
             .accessibilityAddTraits(.isHeader)
-          if isSample {
-            ViewThatFits(in: .horizontal) {
-              chainRow([.base, .ethereum, .solana, .bitcoin])
-              VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                chainRow([.base, .ethereum])
-                chainRow([.solana, .bitcoin])
-              }
+          ViewThatFits(in: .horizontal) {
+            chainRow([.base, .ethereum, .solana, .arbitrum])
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+              chainRow([.base, .ethereum])
+              chainRow([.solana, .arbitrum])
             }
-            chainRow([.near, .arbitrum])
-          } else {
-            chainRow([.base])
           }
+          chainRow([.bnb, .polygon, .sui])
         }
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
           Text(isSample ? "Amount" : "Target escrow amount")
@@ -118,7 +87,7 @@ struct GoalFundingPage: View {
               .lineLimit(1)
               .minimumScaleFactor(0.5)
             Spacer()
-            Text(chain.asset)
+            Text("USDC")
               .runnerText(.footnote)
               .padding(.horizontal, Theme.Spacing.md)
               .padding(.vertical, Theme.Spacing.xs)
@@ -132,8 +101,8 @@ struct GoalFundingPage: View {
           heading: isSample ? "Sample quote" : "Funding details",
           recipientLabel: "Goal escrow receives",
           sends: isSample
-            ? "\(sourceAmount) \(chain.asset) on \(chain.rawValue)"
-            : String(localized: "Quoted in USDC on Base"),
+            ? "\(sourceAmount) USDC on \(chain.title)"
+            : String(localized: "Quoted in USDC on \(chain.title)"),
           receives: "\(draft.amount.formatted(.number)) USDC on NEAR",
           returnAddress: returnAddress,
           canEditReturnAddress: submittedAddress == nil,
@@ -180,13 +149,13 @@ struct GoalFundingPage: View {
         }
       }
     } message: {
-      Text("Enter a wallet address for \(chain.asset) on \(chain.rawValue).")
+      Text("Enter a wallet address for USDC on \(chain.title).")
     }
     .sheet(isPresented: $showingDeposit) {
       IntentDepositSheet(
-        heading: "Sample deposit", amount: sourceAmount, asset: chain.asset,
-        network: chain.rawValue,
-        address: chain.sampleDepositAddress,
+        heading: "Sample deposit", amount: sourceAmount, asset: "USDC",
+        network: chain.title,
+        address: "Example deposit address",
         onDone: {
           UserDefaults.standard.set(returnAddress, forKey: chain.returnAddressKey)
           showingDeposit = false
@@ -204,7 +173,7 @@ struct GoalFundingPage: View {
         })
     }
     .alert(item: $fundingError) { error in
-      Alert(title: Text("Goal funding"), message: Text(error.message))
+      Alert(title: Text("Goal funding"), message: Text(error.message(network: chain.title)))
     }
   }
 
@@ -225,12 +194,8 @@ struct GoalFundingPage: View {
       return
     }
     let address = submittedAddress ?? returnAddress
-    guard address.lowercased().hasPrefix("0x"), address.utf8.count == 42,
-      address.utf8.dropFirst(2).contains(where: { $0 != 48 }),
-      address.utf8.dropFirst(2).allSatisfy({
-        (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0)
-      })
-    else {
+    let source = chain
+    guard source.isValid(returnAddress: address) else {
       fundingError = .invalidAddress
       return
     }
@@ -241,9 +206,11 @@ struct GoalFundingPage: View {
       do {
         let quote = try await service.quote(
           goalID: requestID, goal: EscrowGoal(distanceM: distance, maxSeconds: draft.maxSeconds),
-          amount: NSDecimalNumber(decimal: atomic).stringValue, returnAddress: address)
-        UserDefaults.standard.set(address, forKey: chain.returnAddressKey)
-        if let deposit = GoalOverview.Deposit(id: requestID, goal: draft, quote: quote),
+          amount: NSDecimalNumber(decimal: atomic).stringValue, network: source,
+          returnAddress: address)
+        UserDefaults.standard.set(address, forKey: source.returnAddressKey)
+        if let deposit = GoalOverview.Deposit(
+          id: requestID, goal: draft, network: source, quote: quote),
           deposit.isPayable()
         {
           liveDeposit = deposit
@@ -267,12 +234,13 @@ struct GoalFundingPage: View {
     editingReturnAddress = true
   }
 
-  private func chainRow(_ options: [Chain]) -> some View {
+  private func chainRow(_ options: [FundingNetwork]) -> some View {
     HStack(spacing: Theme.Spacing.xs) {
-      ForEach(options, id: \.self) { option in
-        RunDistanceChip(title: LocalizedStringKey(option.rawValue), selected: chain == option) {
+      ForEach(options) { option in
+        RunDistanceChip(title: LocalizedStringKey(option.title), selected: chain == option) {
           chain = option
         }
+        .disabled(submittedAddress != nil)
       }
     }
     .fixedSize(horizontal: true, vertical: false)

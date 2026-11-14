@@ -139,7 +139,7 @@ extension GoalOverview {
 
 extension GoalRecord {
   fileprivate var displayNetwork: String {
-    originAsset.hasPrefix("nep141:base-") ? "Base" : originAsset
+    FundingNetwork.allCases.first { $0.assetID == originAsset }?.title ?? originAsset
   }
 
   /// The goal with the amount that actually landed in the escrow.
