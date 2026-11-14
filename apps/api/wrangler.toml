@@ -15,7 +15,7 @@ crons = ["0 * * * *"]
 [vars]
 APP_ID = "QHUBYNZ482.io.wades.ije"
 APP_ATTEST_ENV = "production"
-NEAR_RPC_URL = "https://rpc.mainnet.near.org"
+NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
 NEAR_RECIPIENT = "runner-api"
 TREASURY_CONTRACT = "ije-v1-claims.codez2.near"
 ESCROW_CONTRACT = "ije-v1-escrow.codez2.near"

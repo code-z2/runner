@@ -227,8 +227,10 @@ export interface RelayerKey {
   publicKeyText: string;
 }
 
-export function parseRelayerKey(text: string): RelayerKey {
+export function parseRelayerKey(input: string): RelayerKey {
   const failure = new HttpError(500, "relayer_key_invalid");
+  // Secrets piped through `echo` carry a trailing newline.
+  const text = input.trim();
   if (!text.startsWith("ed25519:")) throw failure;
   let raw: Uint8Array;
   try {

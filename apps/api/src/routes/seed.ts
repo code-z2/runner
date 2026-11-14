@@ -55,9 +55,16 @@ async function sendSeedTransfer(
   seeder: SeederConfig,
   accountId: string,
 ): Promise<string> {
-  const key = parseRelayerKey(env.SEEDER_SECRET_KEY);
+  let key: ReturnType<typeof parseRelayerKey>;
+  try {
+    key = parseRelayerKey(env.SEEDER_SECRET_KEY);
+  } catch {
+    console.error("SEEDER_SECRET_KEY is not an ed25519:<base58 secret+public> key");
+    throw new HttpError(503, "seeder_key_invalid");
+  }
   const seederKey = await viewAccessKey(env.NEAR_RPC_URL, seeder.accountId, key.publicKeyText);
   if (!seederKey?.fullAccess) {
+    console.error(`SEEDER_SECRET_KEY ${key.publicKeyText} is not a full-access key of ${seeder.accountId}`);
     throw new HttpError(503, "seeder_key_mismatch");
   }
   for (let attempt = 0; attempt < 2; attempt++) {
