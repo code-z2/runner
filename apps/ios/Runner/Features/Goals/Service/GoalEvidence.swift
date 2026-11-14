@@ -29,6 +29,30 @@ nonisolated struct GoalRunProof: Codable, Sendable {
   let signature: String
 }
 
+/// The server's one signature for a run: a claim pass for Community and a
+/// run proof for Goals. The server signs a run once, so both read this.
+nonisolated struct RunPass: Codable, Sendable, Equatable {
+  let runID: UUID
+  /// Signed claim-pass JSON, submitted to the treasury unchanged.
+  let attestation: String
+  let signature: String
+  let nonce: String
+  let maxAmountCents: Int
+  let expiresAt: Int
+  let distanceM: Int
+  let startedAt: Int
+  let runProof: GoalRunProof
+  var claimed = false
+
+  var claimable: Decimal { Decimal(maxAmountCents) / 100 }
+
+  func isOpen(at date: Date = .now) -> Bool {
+    !claimed && maxAmountCents > 0 && Double(expiresAt) > date.timeIntervalSince1970
+  }
+}
+
+extension GoalRunProof: Equatable {}
+
 nonisolated enum GoalEvidenceError: Error {
   case missingStepEvidence
 }
@@ -56,17 +80,21 @@ nonisolated enum GoalUnlockOutcome: Sendable, Equatable {
   }
 }
 
-/// Finished-run evidence kept on device until the locked goal can use it,
-/// and the server proof for the run that beats it. Checking a run only
-/// talks to the Worker; the chain unlock happens on withdraw.
+/// Finished-run evidence kept on device, the server's pass for each signed
+/// run, and the proof for the run that beats the locked goal. The newest
+/// eligible run is signed once, right after it finishes; Goals and
+/// Community share that pass. Checking only talks to the Worker; chain
+/// calls happen on withdraw and claim.
 actor GoalEvidence {
   private let keychain: any SecureStore
   private let lastProofKey = "goals.last-run-proof"
   private let candidateKey = "goals.run-candidate"
   private let rejectionKey = "goals.last-run-rejection"
+  private let passesKey = "runs.passes"
   private var checking = false
   private var runCandidates: [RunCandidate]?
   private var persistedProof: CachedProof?
+  private var runPasses: [RunPass]?
 
   init(keychain: any SecureStore) {
     self.keychain = keychain
@@ -90,6 +118,16 @@ actor GoalEvidence {
     try await saveCandidates(candidates)
   }
 
+  /// Sign the newest saved run if it has no pass yet, so its claim pass is
+  /// ready. Nil while another check is running.
+  func attestNewest(using service: GoalService) async throws -> RunPass? {
+    guard !checking else { return nil }
+    checking = true
+    defer { checking = false }
+    try await signNewest(using: service)
+    return try await openPass()
+  }
+
   /// Get the server's run proof for a saved run that beats `goal`.
   /// Nil while another check is running.
   func check(goal: GoalRecord?, using service: GoalService) async throws -> GoalUnlockOutcome? {
@@ -97,6 +135,7 @@ actor GoalEvidence {
     checking = true
     defer { checking = false }
 
+    try await signNewest(using: service)
     guard let goal, goal.state == "locked" else { return .noGoal }
     if try await cachedProof()?.goalID == goal.id { return .proven(goalID: goal.id) }
     try await loadCandidates()
@@ -108,36 +147,127 @@ actor GoalEvidence {
     let matching = candidates.filter { $0.qualifies(for: goal, lockedAt: goal.lockedAt) }
     guard !matching.isEmpty else { return .noQualifyingRun }
     var refusal = "the run couldn’t be checked."
-    for var candidate in matching {
-      if candidate.steps == nil {
-        do {
-          candidate.steps = try await candidate.measuredSteps()
-        } catch GoalEvidenceError.missingStepEvidence {
+    for candidate in matching {
+      let proof: GoalRunProof
+      if let pass = try await passes().first(where: { $0.runID == candidate.id }) {
+        proof = pass.runProof
+      } else if let reason = candidate.refusal {
+        refusal = reason
+        continue
+      } else {
+        switch try await sign(candidate, using: service) {
+        case .signed(let pass): proof = pass.runProof
+        case .refused(let reason):
+          refusal = reason
+          continue
+        case .missingMotion:
           return .refused("allow Motion & Fitness for Ije in Settings.")
         }
-        guard var current = runCandidates,
-          let index = current.firstIndex(where: { $0.id == candidate.id })
-        else { continue }
-        current[index] = candidate
-        try await saveCandidates(current)
       }
-      guard let evidence = candidate.evidence else {
-        refusal = "average cadence must be 100–230 steps a minute."
-        continue
-      }
-      let proof: GoalRunProof
-      do {
-        proof = try await service.attest(evidence)
-      } catch GatewayError.server(let status, let code) where status == 422 || status == 409 {
-        refusal = Self.serverReason(code)
-        continue
-      }
-      let fresh = CachedProof(runID: evidence.id, proof: proof, goalID: goal.id)
+      let fresh = CachedProof(runID: candidate.id, proof: proof, goalID: goal.id)
       persistedProof = fresh
       try await keychain.save(JSONEncoder().encode(fresh), forKey: lastProofKey)
       return .proven(goalID: goal.id)
     }
     return .refused(refusal)
+  }
+
+  /// The newest unspent, unexpired claim pass.
+  func openPass(at date: Date = .now) async throws -> RunPass? {
+    try await passes().first { $0.isOpen(at: date) }
+  }
+
+  /// The treasury accepted (or already holds) this pass: never offer it again.
+  func markClaimed(nonce: String) async throws {
+    var current = try await passes()
+    guard let index = current.firstIndex(where: { $0.nonce == nonce }) else { return }
+    current[index].claimed = true
+    try await savePasses(current)
+  }
+
+  private enum Signing {
+    case signed(RunPass)
+    case refused(String)
+    case missingMotion
+  }
+
+  /// The newest saved run, once: a refusal is remembered so refreshes don't
+  /// ask the server again.
+  private func signNewest(using service: GoalService) async throws {
+    try await loadCandidates()
+    guard let newest = runCandidates?.first, newest.refusal == nil,
+      try await !passes().contains(where: { $0.runID == newest.id })
+    else { return }
+    _ = try await sign(newest, using: service)
+  }
+
+  /// Measure steps if needed, then ask the server to sign `candidate`.
+  private func sign(_ candidate: RunCandidate, using service: GoalService) async throws -> Signing {
+    var candidate = candidate
+    if candidate.steps == nil {
+      do {
+        candidate.steps = try await candidate.measuredSteps()
+      } catch GoalEvidenceError.missingStepEvidence {
+        return .missingMotion
+      }
+      try await update(candidate)
+    }
+    guard let evidence = candidate.evidence else {
+      candidate.refusal = "average cadence must be 100–230 steps a minute."
+      try await update(candidate)
+      return .refused(candidate.refusal ?? "")
+    }
+    let claimPass: ClaimPass
+    do {
+      claimPass = try await service.attest(evidence)
+    } catch GatewayError.server(let status, let code) where status == 422 || status == 409 {
+      candidate.refusal = Self.serverReason(code)
+      try await update(candidate)
+      return .refused(candidate.refusal ?? "")
+    }
+    guard let json = claimPass.runProof, let signature = claimPass.runProofSignature else {
+      throw GoalServiceError.missingRunProof
+    }
+    let pass = RunPass(
+      runID: evidence.id, attestation: claimPass.attestation, signature: claimPass.signature,
+      nonce: claimPass.nonce, maxAmountCents: claimPass.maxAmountCents,
+      expiresAt: claimPass.expiresAt, distanceM: evidence.distanceM,
+      startedAt: evidence.startedAt, runProof: GoalRunProof(json: json, signature: signature))
+    try await savePasses([pass] + passes().filter { $0.runID != pass.runID })
+    return .signed(pass)
+  }
+
+  private func update(_ candidate: RunCandidate) async throws {
+    guard var current = runCandidates,
+      let index = current.firstIndex(where: { $0.id == candidate.id })
+    else { return }
+    current[index] = candidate
+    try await saveCandidates(current)
+  }
+
+  private func passes() async throws -> [RunPass] {
+    if let runPasses { return runPasses }
+    let stored =
+      try await keychain.load(forKey: passesKey).map {
+        try JSONDecoder().decode([RunPass].self, from: $0)
+      } ?? []
+    runPasses = stored
+    return stored
+  }
+
+  /// Keeps passes a goal may still use (their run is saved) or that can
+  /// still be claimed.
+  private func savePasses(_ passes: [RunPass]) async throws {
+    try await loadCandidates()
+    let saved = Set((runCandidates ?? []).map(\.id))
+    let now = Int(Date().timeIntervalSince1970)
+    let kept = Array(passes.filter { saved.contains($0.runID) || $0.expiresAt > now }.prefix(8))
+    runPasses = kept
+    if kept.isEmpty {
+      try await keychain.delete(forKey: passesKey)
+    } else {
+      try await keychain.save(JSONEncoder().encode(kept), forKey: passesKey)
+    }
   }
 
   /// The proof that beats `goalID`, if a check produced one.
@@ -223,6 +353,8 @@ private nonisolated struct RunCandidate: Codable, Sendable {
   let kilometerSplits: [Int]
   let activeIntervals: [DateInterval]
   var steps: Int?
+  /// Why the server (or the cadence check) refused to sign this run.
+  var refusal: String?
 
   struct Rejection: Error {
     let message: String

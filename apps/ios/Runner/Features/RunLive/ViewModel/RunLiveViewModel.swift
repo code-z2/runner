@@ -47,6 +47,10 @@ final class RunLiveViewModel: AppViewModelType {
   private var measuredSpeed: Double?
   private var session: WorkoutSession?
   private static let healthExportKey = "run.appleHealthExport"
+
+  /// Apple Health only gets runs longer than this, so accidental starts and
+  /// quick tests don't clutter the user's workouts.
+  static let minimumHealthExportMeters = 200.0
   private let preferences: UserDefaults
   private(set) var healthExportEnabled: Bool
   private(set) var healthExportFailed = false
@@ -215,8 +219,9 @@ final class RunLiveViewModel: AppViewModelType {
     try snapshots.clear()
     self.session = nil
     healthExportFailed = false
-    if healthExportEnabled, finished.finishReason == .userFinished {
-      let distance = record.distanceMeters
+    if healthExportEnabled, finished.finishReason == .userFinished,
+      let distance = record.distanceMeters, distance > Self.minimumHealthExportMeters
+    {
       Task {
         refreshHealthAccess()
         do {

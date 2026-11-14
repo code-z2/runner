@@ -16,7 +16,7 @@ struct RunReadyToolbar: ViewModifier {
         .toolbar {
           ToolbarItem(placement: .title) { RunDateLabel(date: date) }
           ToolbarItem(placement: .topBarTrailing) {
-            Button("Community", action: showCommunity)
+            Button("Club", action: showCommunity)
               .buttonStyle(.pill(.secondary, compact: true))
           }
           .sharedBackgroundVisibility(.hidden)

@@ -66,6 +66,9 @@ final class RootNavigation {
 enum HomeDestination: Hashable, Sendable {
 
   case community
+  case communityFunding
+  case claimAmount(CommunityPlace)
+  case claimDone(ClaimReceipt)
 
   case history
 
@@ -76,6 +79,13 @@ enum HomeDestination: Hashable, Sendable {
   case summary(RunSummary)
 
   case savedSummary(RunSummary)
+
+  var usesDarkAppearance: Bool {
+    switch self {
+    case .claimAmount, .claimDone: true
+    default: false
+    }
+  }
 }
 
 enum GoalDestination: Hashable, Sendable {

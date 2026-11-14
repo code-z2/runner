@@ -102,7 +102,15 @@ describe("POST /v1/relay", () => {
           return Response.json({ error: { name: "HANDLER_ERROR", cause: { info: { error: "InvalidNonce" } } } }, { status: 400 });
         }
         sent.push({ bytes: Buffer.from(body.params.signed_tx_base64, "base64") });
-        return Response.json({ result: { status: { SuccessValue: "" }, receipts_outcome: [] } });
+        return Response.json({
+          result: {
+            status: { SuccessValue: "" },
+            receipts_outcome: [
+              { outcome: { status: { SuccessValue: "" }, logs: [] } },
+              { outcome: { status: { SuccessValue: "dHJ1ZQ==" }, logs: ["claim abc approved as DAO proposal 7"] } },
+            ],
+          },
+        });
       }
       return Response.json({ error: { name: "UNKNOWN" } }, { status: 400 });
     });
@@ -130,8 +138,9 @@ describe("POST /v1/relay", () => {
     const signedDelegate = signDelegate(delegateFor());
     const response = await post(signedDelegate);
     expect(response.status).toBe(200);
-    const result = (await response.json()) as { transaction_hash: string; status: string };
+    const result = (await response.json()) as { transaction_hash: string; status: string; logs: string[] };
     expect(result.status).toBe("succeeded");
+    expect(result.logs).toEqual(["claim abc approved as DAO proposal 7"]);
     expect(sent).toHaveLength(1);
 
     const tx = sent[0].bytes;

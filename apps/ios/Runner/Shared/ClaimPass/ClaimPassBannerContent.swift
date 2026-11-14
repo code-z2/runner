@@ -14,7 +14,7 @@ struct ClaimPassBannerContent: View {
         Text(communityBalanceLow ? "Claim pass" : "Claim pass ready")
           .runnerText(.subheadlineMedium)
         if communityBalanceLow {
-          Text("Community balance is low")
+          Text("Club balance is low")
             .runnerText(.caption)
             .foregroundStyle(Theme.Colors.foregroundSecondary)
         } else {

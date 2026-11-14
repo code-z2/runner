@@ -23,9 +23,22 @@ public struct RelayResult: Sendable, Equatable, Decodable {
 
   public let status: Status
 
-  public init(transactionHash: String, status: Status) {
+  /// Every receipt's logs, in order. A call can succeed without doing what
+  /// was asked; the contract's logs say what it did.
+  public let logs: [String]
+
+  public init(transactionHash: String, status: Status, logs: [String] = []) {
     self.transactionHash = transactionHash
     self.status = status
+    self.logs = logs
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      transactionHash: try container.decode(String.self, forKey: .transactionHash),
+      status: try container.decode(Status.self, forKey: .status),
+      logs: try container.decodeIfPresent([String].self, forKey: .logs) ?? [])
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -33,5 +46,7 @@ public struct RelayResult: Sendable, Equatable, Decodable {
     case transactionHash = "transaction_hash"
 
     case status
+
+    case logs
   }
 }

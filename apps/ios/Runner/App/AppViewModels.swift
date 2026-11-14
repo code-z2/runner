@@ -51,7 +51,7 @@ final class AppViewModels {
       canTrackEncounters: { [app] in
         app.permissions.bluetooth.status == .ready
       },
-      onFinishedRun: { [app] run, distance, splits in
+      onFinishedRun: { [app, weak self] run, distance, splits in
         guard let service = app.goals else { return }
         do {
           try await service.recordRun(run, distanceMeters: distance, splits: splits)
@@ -60,9 +60,19 @@ final class AppViewModels {
             "Could not retain workout evidence: \(error.localizedDescription, privacy: .private)")
           return
         }
-        Task { await Self.checkGoalRun(using: service) }
+        Task {
+          // Sign the run now so its claim pass shows on the summary.
+          do { try await service.attestLatestRun() } catch {
+            Self.goalLog.debug(
+              "Run signing deferred: \(error.localizedDescription, privacy: .private)")
+          }
+          await self?.community.refreshPass()
+          await Self.checkGoalRun(using: service)
+        }
       })
   }
+
+  lazy var community = CommunityViewModel(service: app.community)
 
   /// Prove a saved run against the locked goal (Worker only, no chain
   /// transaction). The proof is cached for the Goals page and withdraw.

@@ -1,6 +1,6 @@
 import { fromBase64, hashHex, utf8 } from "../codec";
 import type { Env } from "../env";
-import { HttpError, parseObject } from "../http";
+import { HttpError, parseObject, type Json } from "../http";
 import { oneClick } from "../oneClick";
 import { goalQuote } from "./goals";
 import { checkDevice } from "./runner";
@@ -27,6 +27,7 @@ export async function proxyIntent(request: Request, env: Env, url: URL): Promise
   if (path === "/v0/quote") {
     const quote = parseObject(body, "invalid_intent_quote");
     if (quote.dry === false && quote.recipient === env.ESCROW_CONTRACT) return goalQuote(env, quote, body);
+    if (quote.dry === false && quote.recipient === env.DAO_ACCOUNT) checkPoolQuote(env, quote);
   }
   const upstream = await oneClick(env.ONE_CLICK_API_KEY, path + url.search,
     body ? { method: "POST", body, headers: { "content-type": "application/json" } } : {});
@@ -34,4 +35,15 @@ export async function proxyIntent(request: Request, env: Env, url: URL): Promise
     status: upstream.status,
     headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", "cache-control": "no-store" },
   });
+}
+
+/** A pool gift lands as plain USDC in the DAO: no message, nothing else. */
+function checkPoolQuote(env: Env, quote: Json): void {
+  if (
+    quote.destinationAsset !== `nep141:${env.TOKEN_CONTRACT}` ||
+    quote.recipientType !== "DESTINATION_CHAIN" ||
+    quote.customRecipientMsg !== undefined
+  ) {
+    throw new HttpError(422, "invalid_pool_quote");
+  }
 }

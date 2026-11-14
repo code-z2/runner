@@ -86,6 +86,7 @@ struct GatewayClientTests {
     #expect(pass.accountID == "runner.ije.near")
     #expect(pass.maxAmountCents == 256)
     #expect(pass.activityHash == "deadbeef")
+    #expect(pass.attestation == String(data: inner, encoding: .utf8))
     let request = await transport.lastRequest
     #expect(request?.url?.path == "/v1/attestations")
   }
@@ -230,10 +231,14 @@ struct GatewayClientTests {
     let transport = MockHTTPTransport()
     let (client, _) = try self.client(transport: transport)
     await transport.enqueue(
-      try json(["transaction_hash": "9abcdef", "status": "succeeded"]), status: 200)
+      try json(["transaction_hash": "9abcdef", "status": "succeeded", "logs": ["claim n approved"]]
+      ),
+      status: 200)
     let result = try await client.relay(
       RelayRequest(signedDelegateB64: "AAAA", keyID: "key-1", assertionB64: "BBBB"))
-    #expect(result == RelayResult(transactionHash: "9abcdef", status: .succeeded))
+    #expect(
+      result
+        == RelayResult(transactionHash: "9abcdef", status: .succeeded, logs: ["claim n approved"]))
     let request = await transport.lastRequest
     #expect(request?.url?.path == "/v1/relay")
     let body = try #require(

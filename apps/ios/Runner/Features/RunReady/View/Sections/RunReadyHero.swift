@@ -28,7 +28,7 @@ struct RunReadyHero: View {
             RunWeatherHighlight(weather: weather)
           }
           if !dynamicType.isAccessibilitySize { Spacer(minLength: Theme.Spacing.xs) }
-          Button("Community", action: showCommunity)
+          Button("Club", action: showCommunity)
             .buttonStyle(.pill(.secondary, compact: true))
         }
       } else {

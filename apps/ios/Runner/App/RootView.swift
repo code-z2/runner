@@ -23,6 +23,7 @@ struct RootView: View {
   var body: some View {
     HomeView(
       run: viewModels.run, live: viewModels.live, goalService: goalService,
+      community: viewModels.community,
       weatherModel: viewModels.weather,
       navigation: homeNavigation
     )
@@ -55,7 +56,7 @@ struct RootView: View {
           }
       }
     }
-    .preferredColorScheme(.light)
+    .preferredColorScheme(homeNavigation.path.last?.usesDarkAppearance == true ? .dark : .light)
     .onChange(of: navigation.route) { _, route in
       if route == .launch, !viewModels.live.hasSession { homeNavigation.path.removeAll() }
     }

@@ -2,13 +2,13 @@ import RunnerUI
 import SwiftUI
 
 struct IntentQuoteCard: View {
-  let heading: LocalizedStringKey
+  let heading: LocalizedStringKey?
   let recipientLabel: LocalizedStringKey
   let sends: String
   let receives: String
   let returnAddress: String
   var canEditReturnAddress = true
-  let onEditReturnAddress: () -> Void
+  let onEditReturnAddress: (() -> Void)?
 
   private var displayedReturnAddress: String {
     if returnAddress.count <= 18 { return returnAddress }
@@ -17,34 +17,36 @@ struct IntentQuoteCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-      Text(heading)
-        .runnerText(.eyebrow)
-        .accessibilityAddTraits(.isHeader)
+      if let heading {
+        Text(heading).runnerText(.eyebrow).accessibilityAddTraits(.isHeader)
+      }
       quoteRow("You send", value: sends)
       quoteRow(recipientLabel, value: receives, highlighted: true)
       quoteRow("Swap by", value: "NEAR Intents")
-      Divider()
-      HStack(spacing: Theme.Spacing.sm) {
-        Text("Return address").foregroundStyle(Theme.Colors.foregroundSecondary)
-        Spacer(minLength: 0)
-        Button(action: onEditReturnAddress) {
-          if returnAddress.isEmpty {
-            Label {
-              Text("Edit").underline()
-            } icon: {
-              Image(systemName: "pencil")
+      if let onEditReturnAddress {
+        Divider()
+        HStack(spacing: Theme.Spacing.sm) {
+          Text("Return address").foregroundStyle(Theme.Colors.foregroundSecondary)
+          Spacer(minLength: 0)
+          Button(action: onEditReturnAddress) {
+            if returnAddress.isEmpty {
+              Label {
+                Text("Edit").underline()
+              } icon: {
+                Image(systemName: "pencil")
+              }
+            } else {
+              Text(displayedReturnAddress)
             }
-          } else {
-            Text(displayedReturnAddress)
           }
+          .buttonStyle(.plain)
+          .disabled(!canEditReturnAddress)
+          .foregroundStyle(Theme.Colors.primary)
+          .accessibilityLabel("Edit return address")
+          .accessibilityValue(returnAddress)
         }
-        .buttonStyle(.plain)
-        .disabled(!canEditReturnAddress)
-        .foregroundStyle(Theme.Colors.primary)
-        .accessibilityLabel("Edit return address")
-        .accessibilityValue(returnAddress)
+        .runnerText(.footnote)
       }
-      .runnerText(.footnote)
     }
     .padding(Theme.Spacing.md)
     .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))

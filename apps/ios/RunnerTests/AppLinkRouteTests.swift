@@ -34,7 +34,7 @@ struct AppLinkRouteTests {
     let id = UUID()
     let record = GoalRecord(
       id: id, state: "locked", distanceM: 1_000, maxSeconds: 2_100, amount: "5000000",
-      originAsset: "nep141:base-0xabc.omft.near", returnAddress: "0x1", lockID: "0",
+      originAsset: FundingNetwork.base.assetID, returnAddress: "0x1", lockID: "0",
       lockedAt: 1_800_000_000)
 
     let unproven = GoalOverview(records: [record])

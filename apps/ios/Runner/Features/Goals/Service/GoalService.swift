@@ -26,9 +26,6 @@ actor GoalService {
     case processing
   }
 
-  /// USDC on Base, the only funding source offered today.
-  static let baseUSDC = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near"
-
   private let account: GoalAccount
   private let gateway: any GatewayClient
   private let intents: any IntentFunctions
@@ -59,14 +56,15 @@ actor GoalService {
   /// A payable quote that delivers `amount` USDC to the escrow as a lock on
   /// `goal`. Retrying with the same `goalID` returns the saved quote.
   func quote(
-    goalID: UUID, goal: EscrowGoal, amount: String, returnAddress: String
+    goalID: UUID, goal: EscrowGoal, amount: String, network: FundingNetwork,
+    returnAddress: String
   ) async throws -> IntentQuote {
     await begin()
     defer { end() }
     let quote = try await intents.quote(
       IntentQuoteRequest(
         dry: false, swapType: "EXACT_OUTPUT", slippageBps: 100,
-        originAsset: Self.baseUSDC, depositType: "ORIGIN_CHAIN",
+        originAsset: network.assetID, depositType: "ORIGIN_CHAIN",
         destinationAsset: "nep141:\(deployment.token)", amount: amount,
         refundTo: returnAddress, refundType: "ORIGIN_CHAIN",
         recipient: deployment.escrow, recipientType: "DESTINATION_CHAIN",
@@ -134,16 +132,26 @@ actor GoalService {
     throw GoalServiceError.unlockPending
   }
 
-  /// The server-signed run proof for `activity`.
-  func attest(_ activity: GoalRunEvidence) async throws -> GoalRunProof {
+  /// The server's claim pass and run proof for `activity`. The server
+  /// signs each run once; `GoalEvidence` keeps the result.
+  func attest(_ activity: GoalRunEvidence) async throws -> ClaimPass {
     await begin()
     defer { end() }
-    let pass = try await gateway.claimPass(
+    return try await gateway.claimPass(
       account.signed(action: nil, fields: ActivityFields(activity: activity)))
-    guard let json = pass.runProof, let signature = pass.runProofSignature else {
-      throw GoalServiceError.missingRunProof
-    }
-    return GoalRunProof(json: json, signature: signature)
+  }
+
+  /// Sign the run that just finished, so its claim pass is ready.
+  func attestLatestRun() async throws {
+    _ = try await evidence.attestNewest(using: self)
+  }
+
+  /// Runs `operation` in this account's turn. Community shares the device
+  /// key, whose App Attest counter must reach the Worker in order.
+  func exclusive<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
+    await begin()
+    defer { end() }
+    return try await operation()
   }
 
   func recordRun(_ run: FinishedRunModel, distanceMeters: Double?, splits: [Double]) async throws {

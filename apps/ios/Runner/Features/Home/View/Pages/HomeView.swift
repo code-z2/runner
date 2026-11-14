@@ -1,3 +1,5 @@
+import RunnerGateway
+import RunnerNear
 import RunnerUI
 import SwiftUI
 
@@ -6,6 +8,7 @@ struct HomeView: View {
   let run: RunViewModel
   var live: RunLiveViewModel?
   var goalService: GoalService?
+  var community = CommunityViewModel()
   let weatherModel: WeatherModel
   var date: Date = .now
   @AppStorage("pacePilot.enabled")
@@ -23,8 +26,21 @@ struct HomeView: View {
   private var hidesTabBar: Bool {
     if selection == .goals { return !navigation.goalPath.isEmpty }
     switch navigation.path.last {
-    case .countdown, .live, .summary: return true
+    case .countdown, .live, .summary, .communityFunding, .claimAmount, .claimDone: return true
     default: return false
+    }
+  }
+
+  /// The pass signed for the run just finished, for its summary banner.
+  private func claimPass(for run: RunSummary) -> ClaimPass? {
+    guard let pass = community.pass, pass.runID == run.id else { return nil }
+    return ClaimPass(pass)
+  }
+
+  private var poolQuote: ((Decimal, FundingNetwork, String) async throws -> IntentQuote)? {
+    guard community.isAvailable else { return nil }
+    return { [community] amount, network, address in
+      try await community.quote(amount: amount, network: network, returnAddress: address)
     }
   }
 
@@ -45,7 +61,35 @@ struct HomeView: View {
           .navigationDestination(for: HomeDestination.self) { destination in
             switch destination {
             case .community:
-              CommunityPage()
+              CommunityPage(
+                balance: community.balance ?? 0, places: community.places,
+                placesUnavailable: community.placesUnavailable,
+                onFund: { navigation.open(.communityFunding) },
+                onClaim: { navigation.open(.claimAmount($0)) }
+              )
+              .task { await community.refresh() }
+              .refreshable { await community.refresh() }
+            case .communityFunding:
+              CommunityFundingPage(
+                balance: community.balance ?? 0,
+                requestQuote: poolQuote,
+                onFunded: {
+                  guard navigation.path.last == destination else { return }
+                  navigation.path.removeLast()
+                }, unavailable: poolQuote == nil)
+            case .claimAmount(let place):
+              ClaimAmountPage(
+                place: place, claimable: community.claimable, balance: community.balance ?? 0
+              ) { amount in
+                let receipt = try await community.claim(at: place, amount: amount)
+                guard navigation.path.last == destination else { return }
+                navigation.path[navigation.path.count - 1] = .claimDone(receipt)
+              }
+            case .claimDone(let receipt):
+              ClaimDonePage(receipt: receipt) {
+                guard navigation.path.last == destination else { return }
+                navigation.path.removeLast()
+              }
             case .countdown(let distanceKilometers):
               RunCountdownPage(pacePilotEnabled: pacePilotEnabled, coach: live?.coach) {
                 guard navigation.path.last == destination else { return }
@@ -71,6 +115,9 @@ struct HomeView: View {
                 distanceKilometers: RunHistoryMetrics.kilometers(savedRun.distanceMeters),
                 cadence: savedRun.cadenceStepsPerMinute,
                 encounters: savedRun.encounters, splits: savedRun.splits,
+                claimPass: destination == .summary(savedRun) ? claimPass(for: savedRun) : nil,
+                communityBalanceLow: community.balanceLow,
+                openClaim: { navigation.open(.community) },
                 healthConnection: live, showsLatestHealthExport: destination == .summary(savedRun))
             case .history:
               RunHistoryPage(runs: run.runs, unavailable: run.historyUnavailable)

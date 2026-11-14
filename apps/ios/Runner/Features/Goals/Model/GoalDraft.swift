@@ -95,19 +95,22 @@ struct GoalOverview: Sendable {
 }
 
 extension GoalOverview.Deposit {
-  /// Deposit details from a payable USDC-on-Base goal quote.
-  init?(id: UUID, goal: GoalDraft, quote: IntentQuote) {
+  /// Deposit details from a payable goal quote for USDC on `network`.
+  init?(id: UUID, goal: GoalDraft, network: FundingNetwork, quote: IntentQuote) {
     guard let address = quote.depositAddress, !address.isEmpty,
-      let units = Decimal(string: quote.amountIn), units > 0,
+      var units = Decimal(string: quote.amountIn), units > 0,
       let timestamp = quote.deadline,
       let deadline = (try? Date(timestamp, strategy: .iso8601))
         ?? (try? Date(
           timestamp, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
     else { return nil }
+    var whole = Decimal()
+    guard NSDecimalMultiplyByPowerOf10(&whole, &units, Int16(-network.decimals), .plain) == .noError
+    else { return nil }
     self.init(
       id: id, goal: goal,
-      amount: (units / 1_000_000).formatted(.number.precision(.fractionLength(0...6))),
-      asset: "USDC", network: "Base", address: address, memo: quote.depositMemo,
+      amount: whole.formatted(.number.precision(.fractionLength(0...6))),
+      asset: "USDC", network: network.title, address: address, memo: quote.depositMemo,
       deadline: deadline)
   }
 }

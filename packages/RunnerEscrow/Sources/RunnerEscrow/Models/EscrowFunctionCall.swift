@@ -17,6 +17,38 @@ public struct EscrowFunctionCall: Sendable, Equatable {
 
   /// Attached deposit in yoctoNEAR.
   public let depositYocto: String
+
+  /// Prepaid gas, within the Worker relay policy for this method.
+  public var gas: UInt64 = 100 * tgas
+
+  static let tgas: UInt64 = 1_000_000_000_000
+
+  /// Treasury `claim`: spend a claim pass at a registered merchant. The
+  /// attestation passes through unchanged (the attestor signed those
+  /// bytes). 300 Tgas covers the DAO payout and first-claim membership.
+  public static func claim(
+    attestation: String, signatureBase64: String, merchantID: String, amountCents: UInt32,
+    on deployment: EscrowDeployment
+  ) throws -> EscrowFunctionCall {
+    var call = try encode(
+      deployment.treasury, "claim", "0",
+      [
+        "attestation": attestation, "signature": signatureBase64, "merchant_id": merchantID,
+        "amount_cents": amountCents,
+      ])
+    call.gas = 300 * tgas
+    return call
+  }
+
+  fileprivate static func encode(
+    _ receiver: String, _ method: String, _ deposit: String, _ args: [String: Any]
+  ) throws -> EscrowFunctionCall {
+    let data = try JSONSerialization.data(
+      withJSONObject: args, options: [.sortedKeys, .withoutEscapingSlashes])
+    return EscrowFunctionCall(
+      receiverID: receiver, method: method, argsJSON: String(decoding: data, as: UTF8.self),
+      depositYocto: deposit)
+  }
 }
 
 extension EscrowCall {
@@ -52,10 +84,6 @@ extension EscrowCall {
   private func call(
     _ receiver: String, _ method: String, _ deposit: String, _ args: [String: Any]
   ) throws -> EscrowFunctionCall {
-    let data = try JSONSerialization.data(
-      withJSONObject: args, options: [.sortedKeys, .withoutEscapingSlashes])
-    return EscrowFunctionCall(
-      receiverID: receiver, method: method, argsJSON: String(decoding: data, as: UTF8.self),
-      depositYocto: deposit)
+    try EscrowFunctionCall.encode(receiver, method, deposit, args)
   }
 }
