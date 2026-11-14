@@ -16,10 +16,10 @@ base64 = "0.22"
 hex = "0.4"
 bs58 = "0.5"
 near-api = "0.8.7"
-# 1Click models only: the generated endpoint fns never attach partner auth,
-# so transport stays in intents.rs (blocking, X-API-Key). Pinned rev; bump
-# deliberately after reading the upstream diff.
-one-click-sdk-rs = { git = "https://github.com/defuse-protocol/one-click-sdk-rs.git", rev = "f9741c3dcfe406dba2ce8c2ae73a6e025dbaafd9" }
+# 1Click v0 models only (`customRecipientMsg`, `depositMemo`); transport is
+# the Worker proxy, so no TLS feature. Pinned rev; bump deliberately after
+# reading the upstream diff.
+oneclick = { git = "https://github.com/defuse-protocol/one-click-sdk-rs.git", rev = "f9741c3dcfe406dba2ce8c2ae73a6e025dbaafd9", default-features = false }
 reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
