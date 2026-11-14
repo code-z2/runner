@@ -88,13 +88,24 @@ async function recordRelay(env: Env, senderId: string, keyId: string): Promise<v
   }
 }
 
-export function outcome(result: Record<string, unknown>): { status: "succeeded" | "failed"; failure?: unknown } {
+/**
+ * Failed if any receipt failed. `logs` are every receipt's logs in order:
+ * a call can succeed without doing what the caller asked (the treasury
+ * logs whether a claim was approved), so the app reads them.
+ */
+export function outcome(
+  result: Record<string, unknown>,
+): { status: "succeeded" | "failed"; failure?: unknown; logs: string[] } {
   const status = result.status as Record<string, unknown> | undefined;
-  const receipts = (result.receipts_outcome as { outcome?: { status?: Record<string, unknown> } }[] | undefined) ?? [];
+  const receipts =
+    (result.receipts_outcome as { outcome?: { status?: Record<string, unknown>; logs?: unknown } }[] | undefined) ?? [];
   const failure =
     (status && "Failure" in status ? status.Failure : undefined) ??
     receipts.map((receipt) => receipt.outcome?.status?.Failure).find((value) => value !== undefined);
-  return failure === undefined ? { status: "succeeded" } : { status: "failed", failure };
+  const logs = receipts.flatMap((receipt) =>
+    Array.isArray(receipt.outcome?.logs) ? receipt.outcome.logs.filter((log): log is string => typeof log === "string") : [],
+  );
+  return failure === undefined ? { status: "succeeded", logs } : { status: "failed", failure, logs };
 }
 
 export async function relay(request: Request, env: Env): Promise<Response> {

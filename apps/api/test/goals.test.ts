@@ -222,3 +222,18 @@ test("an abandoned quote with the same goal never takes the lock of the paid one
     { id: paid, lock_id: "11", amount: "5000000", return_address: "0x2222222222222222222222222222222222222222" },
   ]);
 });
+
+test("a payable pool quote must deliver plain USDC to the DAO", async () => {
+  const env = createEnv({ ONE_CLICK_API_KEY: "key" });
+  const owner = await runner(env);
+  chain(env, { locks: [] });
+  const pool = (overrides: object = {}) => ({
+    ...goalQuote(env, owner.account, crypto.randomUUID()),
+    recipient: env.DAO_ACCOUNT, customRecipientMsg: undefined, ...overrides,
+  });
+  expect((await owner.proxy(pool())).status).toBe(200);
+  const withMsg = await owner.proxy(pool({ customRecipientMsg: "{}" }));
+  expect(withMsg.status).toBe(422);
+  expect(await withMsg.json()).toEqual({ error: "invalid_pool_quote" });
+  expect((await owner.proxy(pool({ destinationAsset: BASE_USDC }))).status).toBe(422);
+});
