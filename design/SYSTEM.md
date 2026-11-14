@@ -1211,3 +1211,124 @@ Living record of what was built. Update on every completed item.
   - Tests: Worker 79, RunnerNear Rust 17 and Swift 43, RunnerEscrow 19,
     RunnerGateway 17, app 41.
   - Not exercised on a device or with real funds.
+
+### Community UI
+
+- Community combines the wallet pool card with the Places photo and
+  merchant list. Rows show name and distance. The pool card links to
+  Fund the pool via HomeNavigation.
+- Pool funding uses the same quote card and medium deposit sheet as
+  Goals, with pool-specific copy and sample data. Claim amount shows the
+  pass balance separately from pool availability and limits confirmation
+  to the lower amount. The dark receipt leads back to Community.
+- The Xcode previews cover Community, pool funding, claim amount,
+  low funds, and the receipt. Previews use local sample data; the app
+  reads live data (see Community wiring).
+
+- Community’s Places banner uses a panoramic storefront photograph with
+  warm ivory, sand, and bronze tones. Its lower-left composition leaves
+  room for the nearest merchant label.
+
+### Community wiring
+
+- What: Community, Places, claims and pool funding run end to end on
+  mainnet. The pool card shows the DAO's USDC, Places lists approved
+  merchants near the runner, a claim pays a merchant from the pool with
+  the runner's claim pass, and Fund the pool sends a 1Click gift to the
+  DAO.
+- How:
+  - One signature per run. Right after a run finishes, the newest
+    eligible run is signed once by `/v1/attestations` and kept on device
+    as a `RunPass` (claim pass + run proof). Community spends its claim
+    pass; Goals reuses its run proof instead of asking again. Refusals
+    are remembered per run, so refreshes don't re-ask.
+  - Claim: `CommunityService` sends treasury `claim(attestation,
+    signature, merchant_id, amount_cents)` (300 Tgas, built in
+    RunnerEscrow) through the same account, seeding and relay path as
+    the escrow, in the same request turn as Goals (App Attest counters
+    reach the Worker in order).
+  - Paid means the relay reports no failed receipt and the treasury
+    logged `claim <nonce> approved as DAO proposal N`. The relay now
+    returns every receipt's logs. A `released` log leaves the pass
+    usable; a proposal the council must approve spends it.
+  - Open pass: newest unexpired pass not claimed locally and not used
+    on chain (`is_nonce_used`).
+  - Places: the app sends its geohash-5 cell and the 8 around it to
+    `GET /v1/merchants` (never its position) and sorts by distance on
+    device.
+  - Pool: `ft_balance_of(DAO)` on USDC over FastNEAR. Funding asks for an
+    EXACT_OUTPUT quote (USDC on the chosen network to USDC on NEAR,
+    recipient the DAO), so the pool gets exactly the chosen amount.
+    Refunds go to a return address on the source chain, saved per
+    network with the same keys as Goals so a wallet is entered once.
+    Done closes the sheet and returns to Club, which refreshes.
+  - The Worker proxy checks a payable quote to the DAO is plain USDC to
+    the DAO on NEAR with no message (`invalid_pool_quote`).
+- Why: the server signs one run every 4 hours, so Goals and Community
+  must share one pass or the second would be refused. Reading the
+  treasury's own log is the only way to tell an approved payout from a
+  claim the DAO turned down, since both transactions succeed.
+- Importance: claims, pool and places now use real chain and Worker
+  data, and goals keep working with the shared pass.
+- Metadata:
+  - Treasury `ije-v1-claims.codez2.near`, DAO `ije-v1.sputnik-dao.near`
+    (registered on USDC), proposal bond 0.1 NEAR from the treasury.
+  - "Paid for N runs this month" was removed: no data source.
+  - No claim pass opens the claim page at $0 with Confirm disabled.
+    Without a funding service (Debug builds) Fund the pool says it is
+    unavailable instead of showing the sample.
+  - Tests: Worker 80, RunnerGateway 17, RunnerEscrow 21, app 48.
+
+### Club naming, pool card copy and funding networks
+
+- What: the Community feature reads "Club" everywhere in the UI (entry
+  buttons, page title, pool, low-balance notes). The pool card explains
+  the pool: a free claim balance for runners to spend on after-run
+  essentials like water, available globally. Fund the pool takes USDC
+  from Base, Ethereum, Solana, Arbitrum, BNB Chain, Polygon or Sui.
+- How: UI strings only; code, routes and types keep `Community`.
+  `FundingNetwork` holds each chain's 1Click USDC asset id (from
+  `GET /v0/tokens`), its USDC decimals (BNB Chain uses 18) and a
+  return-address shape check (EVM 0x+40 hex, Sui 0x+64 hex, Solana
+  base58 32 to 44 characters). The deposit sheet shows the amount in
+  the source chain's decimals.
+- Why: "Club" is the product name for the feature; the copy says what
+  the pool is for; more chains let more people fund it.
+- Importance: the pool can be funded from any of the seven chains.
+- Metadata: each network returned a dry 1Click quote into the DAO for
+  20 USDC.
+
+### Goal funding networks
+
+- What: goals can be funded with USDC from the same seven networks as
+  the club pool, and the payout returns to the goal's own network and
+  return address.
+- How: Goals uses `FundingNetwork` for its chips, asset id, return
+  address check, saved address and deposit decimals. `GoalService.quote`
+  takes the network. The goals list names the return chain from the
+  saved origin asset. No Worker change: goal quotes already accept any
+  origin asset, and the withdrawal quote already pays out to
+  `origin_asset` at `return_address`.
+- Why: one list of networks for every 1Click funding flow.
+- Importance: runners lock goals from the chain they hold USDC on.
+- Metadata: dry 5 USDC payout quotes returned on all seven chains
+  (Ethereum keeps about $0.30, the others under $0.03). Tests: app 51.
+
+### Club funding custom amount
+
+- What: Fund the pool has an "Other" chip next to $5/$10/$20/$50 that
+  takes any USDC amount with up to two decimals (for example 0.1).
+- How: the typed amount is parsed in the user's locale and must be
+  positive, under $100,000 and whole cents. The quote is still
+  EXACT_OUTPUT, so the pool receives exactly that amount. When 1Click
+  answers "Amount is too low for bridge, try at least N", the page says
+  the smallest gift from that network in USDC.
+- Why: small live tests, and gifts that aren't one of the presets.
+- Importance: lets the pool be tested with real funds for cents.
+- Metadata: dry quotes for 0.1 USDC work from Solana, Arbitrum, BNB
+  Chain, Polygon and Sui. Base needs about 0.15 and Ethereum about 0.30.
+  The parsing helpers are `nonisolated` so tests can call them off the
+  main actor. Tests: app 53.
+  - Live: a 0.2 USDC gift from Base through the app (Release build on
+    device) landed in `ije-v1.sputnik-dao.near` as exactly 200000 units
+    (0.20 USDC) on 2026-11-14.
