@@ -1332,3 +1332,36 @@ Living record of what was built. Update on every completed item.
   - Live: a 0.2 USDC gift from Base through the app (Release build on
     device) landed in `ije-v1.sputnik-dao.near` as exactly 200000 units
     (0.20 USDC) on 2026-11-14.
+
+### Architectural README
+
+- Update: the README is now short. It opens with two proverbs, then says
+  what Ije is (a run club governed by a DAO), how it works (run, set
+  goals, the DAO-chosen attester, funding, claims, membership and voting
+  on partner places), a small diagram, the repo and how to test. The
+  long version below moved to `design/ARCHITECTURE.md`.
+
+- What: `README.md` now explains the whole product: rules the design
+  follows, a system diagram, repo layout, the app's structure, features
+  and packages, the runner's account and device keys, build
+  environments, the Worker's routes, checks, tables and secrets, the
+  contracts and their mainnet accounts, the main flows (run pass, goal
+  lock and withdraw, Club funding and claims, adding a place), privacy,
+  and how to work on the project.
+- How: written in plain English, checked against the code, the
+  migrations, `AppEnvironment` and the live contract config. Mermaid
+  diagrams render on GitHub.
+- Why: one entry point for new contributors and reviewers; the details
+  stay in `design/`.
+- Importance: the repo had a one-line README.
+- Social money framing: the money side is described as social money
+  built on NEAR and governed by the Sputnik DAO. A dedicated section
+  covers why NEAR (keyless setup, relayed gas, contract calls, Intents),
+  the DAO as the centre (it holds the Club pool and owns the treasury and
+  escrow rules), its roles as set on chain (`council` passes contract
+  calls; `claims` passes partner Transfers and runner joins with one
+  vote; `community` runners propose and vote on calls and policy, 3
+  votes), how a claim becomes a public DAO proposal, and how first
+  claims grow the community.
+- Metadata: build 2 of 0.1.0 was uploaded to TestFlight from a Release
+  archive (`RunnerEnvironment = prod`, App Attest production).
