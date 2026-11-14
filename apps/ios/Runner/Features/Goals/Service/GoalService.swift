@@ -134,16 +134,26 @@ actor GoalService {
     throw GoalServiceError.unlockPending
   }
 
-  /// The server-signed run proof for `activity`.
-  func attest(_ activity: GoalRunEvidence) async throws -> GoalRunProof {
+  /// The server's claim pass and run proof for `activity`. The server
+  /// signs each run once; `GoalEvidence` keeps the result.
+  func attest(_ activity: GoalRunEvidence) async throws -> ClaimPass {
     await begin()
     defer { end() }
-    let pass = try await gateway.claimPass(
+    return try await gateway.claimPass(
       account.signed(action: nil, fields: ActivityFields(activity: activity)))
-    guard let json = pass.runProof, let signature = pass.runProofSignature else {
-      throw GoalServiceError.missingRunProof
-    }
-    return GoalRunProof(json: json, signature: signature)
+  }
+
+  /// Sign the run that just finished, so its claim pass is ready.
+  func attestLatestRun() async throws {
+    _ = try await evidence.attestNewest(using: self)
+  }
+
+  /// Runs `operation` in this account's turn. Community shares the device
+  /// key, whose App Attest counter must reach the Worker in order.
+  func exclusive<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
+    await begin()
+    defer { end() }
+    return try await operation()
   }
 
   func recordRun(_ run: FinishedRunModel, distanceMeters: Double?, splits: [Double]) async throws {

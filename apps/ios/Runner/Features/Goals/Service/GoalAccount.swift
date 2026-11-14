@@ -67,9 +67,18 @@ actor GoalAccount: EscrowSubmitter {
 
   /// Sign `call` as a NEP-366 delegate and submit it through `/v1/relay`.
   func submit(_ call: EscrowCall) async throws -> EscrowReceipt {
+    let result = try await relay(call.functionCall(on: deployment))
+    guard result.status != .failed else {
+      throw EscrowError.submitFailed(result.transactionHash)
+    }
+    return EscrowReceipt(reference: result.transactionHash)
+  }
+
+  /// Seed the account if needed, sign `function` as a NEP-366 delegate and
+  /// submit it through `/v1/relay`. The caller reads the outcome.
+  func relay(_ function: EscrowFunctionCall) async throws -> RelayResult {
     let identity = try await identity()
     try await seed(identity)
-    let function = try call.functionCall(on: deployment)
     let access = try await rpc.accessKey(
       accountID: identity.accountID, publicKey: identity.publicKey)
     let block = try await rpc.latestBlock()
@@ -80,21 +89,17 @@ actor GoalAccount: EscrowSubmitter {
     }
     let delegate = try core.encodeDelegateAction(
       senderID: identity.accountID, receiverID: function.receiverID, methodName: function.method,
-      argsJSON: function.argsJSON, gas: 100_000_000_000_000, depositYocto: function.depositYocto,
+      argsJSON: function.argsJSON, gas: function.gas, depositYocto: function.depositYocto,
       nonce: nonce, maxBlockHeight: maxBlockHeight, publicKey: identity.publicKey)
     let digest = try core.nep366DigestHex(delegateB64: delegate)
     let signature = try core.ed25519Sign(secretBase64: identity.secret, messageHex: digest)
     let signedDelegate = try core.encodeSignedDelegate(
       delegateB64: delegate, signatureB64: signature)
     let key = try await deviceKey()
-    let result = try await gateway.relay(
+    return try await gateway.relay(
       RelayRequest(
         signedDelegateB64: signedDelegate, keyID: key,
         assertionB64: try await assertion(signedDelegate, key: key)))
-    guard result.status != .failed else {
-      throw EscrowError.submitFailed(result.transactionHash)
-    }
-    return EscrowReceipt(reference: result.transactionHash)
   }
 
   // MARK: - Private
