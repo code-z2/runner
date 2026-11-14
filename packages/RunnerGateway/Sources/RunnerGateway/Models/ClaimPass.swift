@@ -19,6 +19,9 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
   public let expiresAt: Int
   public let nonce: String
   public let signature: String
+  /// The signed attestation JSON exactly as issued: the treasury verifies
+  /// the signature over these bytes, so they are submitted unchanged.
+  public let attestation: String
   public let runProof: String?
   public let runProofSignature: String?
 
@@ -30,6 +33,7 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
     expiresAt: Int,
     nonce: String,
     signature: String,
+    attestation: String = "",
     runProof: String? = nil,
     runProofSignature: String? = nil
   ) {
@@ -40,6 +44,7 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
     self.expiresAt = expiresAt
     self.nonce = nonce
     self.signature = signature
+    self.attestation = attestation
     self.runProof = runProof
     self.runProofSignature = runProofSignature
   }
@@ -66,6 +71,7 @@ public struct ClaimPass: Sendable, Equatable, Decodable {
       expiresAt: inner.expiresAt,
       nonce: inner.nonce,
       signature: signature,
+      attestation: attestation,
       runProof: try envelope.decodeIfPresent(String.self, forKey: .runProof),
       runProofSignature: try envelope.decodeIfPresent(String.self, forKey: .runProofSignature)
     )

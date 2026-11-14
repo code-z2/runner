@@ -107,6 +107,22 @@ struct EscrowFunctionCallTests {
     #expect(unlock.method == "unlock")
     #expect(unlock.depositYocto == "0")
     #expect(unlock.argsJSON == #"{"lock_id":"7","proof":"{\"v\":1}","signature":"c2ln"}"#)
+    #expect(unlock.gas == 100_000_000_000_000)
+  }
+
+  @Test
+  func claimMapsToTheTreasuryWithClaimGas() throws {
+    let claim = try EscrowFunctionCall.claim(
+      attestation: #"{"v":1}"#, signatureBase64: "c2ln", merchantID: "shop.near",
+      amountCents: 250, on: .mainnet)
+    #expect(claim.receiverID == "ije-v1-claims.codez2.near")
+    #expect(claim.method == "claim")
+    #expect(claim.depositYocto == "0")
+    #expect(claim.gas == 300_000_000_000_000)
+    #expect(
+      claim.argsJSON
+        == #"{"amount_cents":250,"attestation":"{\"v\":1}","merchant_id":"shop.near","signature":"c2ln"}"#
+    )
   }
 }
 
