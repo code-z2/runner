@@ -18,7 +18,8 @@ public actor RunStore {
     _ run: FinishedRunModel,
     distanceMeters: Double?,
     cadenceStepsPerMinute: Int? = nil,
-    encounters: RunEncounterCounts? = nil
+    encounters: RunEncounterCounts? = nil,
+    splits: [Double] = []
   ) throws -> RunRecordSnapshot {
     let runID = run.id
     let existing: [RunRecordModel]
@@ -44,6 +45,7 @@ public actor RunStore {
       batteryLevelAtEnd: run.batteryLevelAtEnd,
       cadenceStepsPerMinute: cadenceStepsPerMinute,
       encounters: encounters,
+      splits: splits,
       recordedAt: Date()
     )
     modelContext.insert(model)

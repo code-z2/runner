@@ -26,9 +26,12 @@ public struct RunRecordSnapshot: Sendable, Equatable {
 
   public let cadenceStepsPerMinute: Int?
 
+  public let splits: [Double]
+
   public let encounters: RunEncounterCounts?
 
   init(model: RunRecordModel) {
+    splits = model.splits ?? []
     cadenceStepsPerMinute = model.cadenceStepsPerMinute
     id = model.runID
     startedAt = model.startedAt

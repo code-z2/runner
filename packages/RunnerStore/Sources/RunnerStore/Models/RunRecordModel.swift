@@ -37,6 +37,8 @@ public final class RunRecordModel {
 
   public var togetherEncounters: Int?
 
+  public var splits: [Double]?
+
   public init(
     runID: UUID,
     startedAt: Date,
@@ -47,6 +49,7 @@ public final class RunRecordModel {
     batteryLevelAtEnd: Float?,
     cadenceStepsPerMinute: Int? = nil,
     encounters: RunEncounterCounts? = nil,
+    splits: [Double] = [],
     recordedAt: Date
   ) {
     self.runID = runID
@@ -60,6 +63,7 @@ public final class RunRecordModel {
     newEncounters = encounters?.new
     repeatEncounters = encounters?.again
     togetherEncounters = encounters?.together
+    self.splits = splits.isEmpty ? nil : splits
     self.recordedAt = recordedAt
   }
 }

@@ -31,6 +31,7 @@ final class RunLiveViewModel: AppViewModelType {
     return elapsed * 1_000 / distanceMeters
   }
 
+  private let onFinishedRun: (@MainActor (FinishedRunModel, Double?, [Double]) async -> Void)?
   private let snapshots: any SessionSnapshotStore
   private let store: @MainActor () throws -> RunStore
   private let location: LocationTracker
@@ -60,6 +61,9 @@ final class RunLiveViewModel: AppViewModelType {
   private var lastMeasuredCadence: Int?
   private var previousLocation: LocationSampleModel?
   private var segmentStartedAt: Date?
+  private var segmentActiveElapsed: TimeInterval = 0
+  private var splits: [Double] = []
+  private var lastSplitElapsed: TimeInterval = 0
 
   init(
     snapshots: any SessionSnapshotStore,
@@ -71,8 +75,10 @@ final class RunLiveViewModel: AppViewModelType {
     coach: RunCoach? = nil,
     canTrackLocation: @escaping @MainActor () -> Bool,
     encounters: EncounterTracker? = nil,
-    canTrackEncounters: @escaping @MainActor () -> Bool = { true }
+    canTrackEncounters: @escaping @MainActor () -> Bool = { true },
+    onFinishedRun: (@MainActor (FinishedRunModel, Double?, [Double]) async -> Void)? = nil
   ) {
+    self.onFinishedRun = onFinishedRun
     self.snapshots = snapshots
     self.store = store
     self.location = location
@@ -119,6 +125,8 @@ final class RunLiveViewModel: AppViewModelType {
     elapsed = 0
     distanceMeters = nil
     lastMeasuredCadence = nil
+    splits = []
+    lastSplitElapsed = 0
     state = .active
     if coaching { coach?.begin(goalKilometers: goalKilometers, history: coachingHistory) }
     if healthExportEnabled {
@@ -162,7 +170,7 @@ final class RunLiveViewModel: AppViewModelType {
     isUpdating = true
     defer { isUpdating = false }
     if state == .paused {
-      try await session.resume(distanceMeters: distanceMeters)
+      try await session.resume(distanceMeters: distanceMeters, splits: splits)
       state = .active
       healthKit.resumeWorkoutSession()
       await startSensors()
@@ -170,7 +178,7 @@ final class RunLiveViewModel: AppViewModelType {
       let startedAt = segmentStartedAt
       segmentStartedAt = nil
       defer { if state == .active { segmentStartedAt = startedAt } }
-      try await session.pause(distanceMeters: distanceMeters)
+      try await session.pause(distanceMeters: distanceMeters, splits: splits)
       state = .paused
       coach?.silence()
       healthKit.pauseWorkoutSession()
@@ -188,7 +196,7 @@ final class RunLiveViewModel: AppViewModelType {
     let startedAt = segmentStartedAt
     segmentStartedAt = nil
     defer { if state == .active { segmentStartedAt = startedAt } }
-    let finished = try await session.finish(distanceMeters: distanceMeters)
+    let finished = try await session.finish(distanceMeters: distanceMeters, splits: splits)
     checkpointTask?.cancel()
     checkpointTask = nil
     state = .finished
@@ -202,7 +210,8 @@ final class RunLiveViewModel: AppViewModelType {
     await stopSensors()
     let record = try await store().record(
       finished, distanceMeters: distanceMeters, cadenceStepsPerMinute: lastMeasuredCadence,
-      encounters: runEncounters)
+      encounters: runEncounters, splits: splits)
+    await onFinishedRun?(finished, record.distanceMeters, record.splits)
     try snapshots.clear()
     self.session = nil
     healthExportFailed = false
@@ -242,7 +251,7 @@ final class RunLiveViewModel: AppViewModelType {
   func checkpoint() async {
     guard !isUpdating, state == .active, let session else { return }
     do {
-      try await session.checkpoint(distanceMeters: distanceMeters)
+      try await session.checkpoint(distanceMeters: distanceMeters, splits: splits)
       let value = await session.activeElapsed
       if !isUpdating, self.session === session, state == .active {
         if encounterBaseline == nil {
@@ -316,6 +325,7 @@ final class RunLiveViewModel: AppViewModelType {
   }
 
   private func startSensors() async {
+    segmentActiveElapsed = await session?.activeElapsed ?? 0
     let startedAt = Date()
     segmentStartedAt = startedAt
     if canTrackLocation(), let events = try? await location.start() {
@@ -414,7 +424,11 @@ final class RunLiveViewModel: AppViewModelType {
           latitude: previousLocation.latitude, longitude: previousLocation.longitude)
         let current = CLLocation(latitude: sample.latitude, longitude: sample.longitude)
         let meters = current.distance(from: previous)
-        distanceMeters = (distanceMeters ?? 0) + meters
+        let before = distanceMeters ?? 0
+        distanceMeters = before + meters
+        recordSplits(
+          before: before, meters: meters, from: previousLocation.timestamp, to: sample.timestamp,
+          segmentStart: startedAt)
         measuredSpeed = meters / sample.timestamp.timeIntervalSince(previousLocation.timestamp)
       } else if distanceMeters == nil {
         distanceMeters = 0
@@ -436,9 +450,27 @@ final class RunLiveViewModel: AppViewModelType {
     }
   }
 
+  private func recordSplits(
+    before: Double, meters: Double, from previous: Date, to current: Date, segmentStart: Date
+  ) {
+    guard meters.isFinite, meters > 0 else { return }
+    let interval = current.timeIntervalSince(previous)
+    let startElapsed = segmentActiveElapsed + previous.timeIntervalSince(segmentStart)
+    var nextKilometer = Double(splits.count + 1) * 1_000
+    while nextKilometer <= before + meters {
+      let crossing = startElapsed + interval * ((nextKilometer - before) / meters)
+      guard crossing.isFinite, crossing > lastSplitElapsed else { return }
+      splits.append(crossing - lastSplitElapsed)
+      lastSplitElapsed = crossing
+      nextKilometer += 1_000
+    }
+  }
+
   private func savePendingRun() async throws {
     guard let snapshot = try snapshots.load(), let pending = snapshot.pendingRun else { return }
-    _ = try await store().record(pending, distanceMeters: snapshot.distanceMeters)
+    let record = try await store().record(
+      pending, distanceMeters: snapshot.distanceMeters, splits: snapshot.splits ?? [])
+    await onFinishedRun?(pending, record.distanceMeters, record.splits)
     try snapshots.clear()
   }
 }

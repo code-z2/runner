@@ -76,24 +76,25 @@ public actor WorkoutSession {
     stateValue = .active
   }
 
-  public func pause(distanceMeters: Double? = nil) throws {
+  public func pause(distanceMeters: Double? = nil, splits: [Double]? = nil) throws {
     guard stateValue == .active else {
       throw SessionError.notActive
     }
     let elapsed = activeElapsed
-    let snapshot = try persist(state: .paused, elapsed: elapsed, distanceMeters: distanceMeters)
+    let snapshot = try persist(
+      state: .paused, elapsed: elapsed, distanceMeters: distanceMeters, splits: splits)
     pausedAt = snapshot.checkpointAtWall
     accumulatedActive = elapsed
     segmentStart = nil
     stateValue = .paused
   }
 
-  public func resume(distanceMeters: Double? = nil) throws {
+  public func resume(distanceMeters: Double? = nil, splits: [Double]? = nil) throws {
     guard stateValue == .paused else {
       throw SessionError.notPaused
     }
     let snapshot = try persist(
-      state: .active, elapsed: accumulatedActive, distanceMeters: distanceMeters)
+      state: .active, elapsed: accumulatedActive, distanceMeters: distanceMeters, splits: splits)
     if let pause = pauseEnding(at: snapshot.checkpointAtWall) {
       pauses.append(pause)
     }
@@ -103,7 +104,7 @@ public actor WorkoutSession {
   }
 
   public func finish(
-    reason: FinishReason = .userFinished, distanceMeters: Double? = nil
+    reason: FinishReason = .userFinished, distanceMeters: Double? = nil, splits: [Double]? = nil
   ) throws -> FinishedRunModel {
     if let finishedRecord {
       return finishedRecord
@@ -112,7 +113,8 @@ public actor WorkoutSession {
       throw SessionError.nothingToFinish
     }
     let snapshot = try persist(
-      state: .finished, elapsed: activeElapsed, distanceMeters: distanceMeters, finishReason: reason
+      state: .finished, elapsed: activeElapsed, distanceMeters: distanceMeters,
+      splits: splits, finishReason: reason
     )
     guard let record = snapshot.pendingRun else { throw SessionError.nothingToFinish }
     accumulatedActive = record.activeElapsed
@@ -122,11 +124,12 @@ public actor WorkoutSession {
     return record
   }
 
-  public func checkpoint(distanceMeters: Double? = nil) throws {
+  public func checkpoint(distanceMeters: Double? = nil, splits: [Double]? = nil) throws {
     guard stateValue == .active || stateValue == .paused else {
       return
     }
-    try persist(state: stateValue, elapsed: activeElapsed, distanceMeters: distanceMeters)
+    try persist(
+      state: stateValue, elapsed: activeElapsed, distanceMeters: distanceMeters, splits: splits)
   }
 
   /// Cuts an unfinished run at its last snapshot. Returns `nil` when there
@@ -167,7 +170,7 @@ public actor WorkoutSession {
   @discardableResult
   private func persist(
     state: SessionState, elapsed: TimeInterval, distanceMeters: Double?,
-    finishReason: FinishReason? = nil
+    splits: [Double]? = nil, finishReason: FinishReason? = nil
   ) throws -> SessionSnapshotModel {
     guard let runID, let startedAtWall else { throw SessionError.notActive }
     let checkpoint = wallClock()
@@ -181,6 +184,7 @@ public actor WorkoutSession {
       batteryLevel: batteryLevel(),
       checkpointAtWall: checkpoint,
       distanceMeters: distanceMeters,
+      splits: splits,
       finishReason: finishReason,
       pauses: pauseIntervals
     )

@@ -105,33 +105,49 @@ struct RunRecoveryTests {
   @MainActor
   @Test
   func locationDistanceExcludesThePausedSegmentAndReachesHistory() async throws {
-    let store = RunStore(modelContainer: try AppDatabase.ephemeral().container)
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = RunStore(modelContainer: try AppDatabase.persistent(in: directory).container)
     let source = TestLocationFeed()
+    let snapshots = InMemorySessionSnapshotStore()
     let live = RunLiveViewModel(
-      snapshots: InMemorySessionSnapshotStore(), store: { store },
+      snapshots: snapshots, store: { store },
       location: LocationTracker(source: source),
       cadence: CadenceTracker(source: LiveCadenceUpdateSource(availabilityChecker: { false })),
       healthKit: LiveHealthKitStore(), canTrackLocation: { true })
 
     try await live.start()
     await source.send(longitude: 0)
-    await source.send(longitude: 0.001)
-    try await waitForDistance(in: live, greaterThan: 100)
+    await source.send(longitude: 0.0055)
+    try await waitForDistance(in: live, greaterThan: 500)
+    await live.checkpoint()
+    #expect(try snapshots.load()?.splits == [])
+    await source.send(longitude: 0.011)
+    try await waitForDistance(in: live, greaterThan: 1_000)
     let firstSegment = try #require(live.distanceMeters)
+    #expect(firstSegment > 1_000)
     #expect(live.pace != nil)
 
     try await live.togglePause()
+    #expect(try snapshots.load()?.splits?.count == 1)
     await source.send(longitude: 0.01)
     #expect(live.distanceMeters == firstSegment)
     try await live.togglePause()
     await source.send(longitude: 0.02)
-    await source.send(longitude: 0.021)
-    try await waitForDistance(in: live, greaterThan: firstSegment + 100)
+    await source.send(longitude: 0.031)
+    try await waitForDistance(in: live, greaterThan: firstSegment + 1_000)
     let finished = try await live.finish()
     let distance = try #require(finished?.distanceMeters)
-    #expect((220...225).contains(distance))
-    let saved = try await store.recentRuns()
+    #expect((2_445...2_450).contains(distance))
+    let splits = try #require(finished?.splits)
+    #expect(splits.count == 2)
+    #expect(splits.allSatisfy { $0 > 0 })
+    #expect(splits.reduce(0, +) <= (finished?.elapsed ?? 0))
+    let reopened = RunStore(modelContainer: try AppDatabase.persistent(in: directory).container)
+    let saved = try await reopened.recentRuns()
     #expect(saved.first?.distanceMeters == distance)
+    #expect(saved.first.map(RunSummary.init(record:))?.splits == splits)
   }
 
   @MainActor
@@ -191,13 +207,16 @@ struct RunRecoveryTests {
     let saved = try await reopened.recentRuns()
     #expect(saved.map { RunSummary(record: $0) } == [finished])
 
-    let interrupted = snapshot(state: .active)
+    let interrupted = snapshot(state: .active, distanceMeters: 1_150, splits: [52])
     try drafts.save(interrupted)
     try await live.recover()
     try await live.recover()
     let recovered = try await store.recentRuns()
     #expect(recovered.count == 2)
-    #expect(recovered.first { $0.id == interrupted.id }?.activeElapsed == 60)
+    let recoveredRun = try #require(recovered.first { $0.id == interrupted.id })
+    #expect(recoveredRun.activeElapsed == 60)
+    #expect(recoveredRun.distanceMeters == 1_150)
+    #expect(RunSummary(record: recoveredRun).splits == [52])
     #expect(try drafts.load() == nil)
   }
 
@@ -245,10 +264,13 @@ struct RunRecoveryTests {
     #expect(saved.contains { $0.id == privateRun?.id })
   }
 
-  private func snapshot(state: SessionState) -> SessionSnapshotModel {
+  private func snapshot(
+    state: SessionState, distanceMeters: Double? = nil, splits: [Double]? = nil
+  ) -> SessionSnapshotModel {
     SessionSnapshotModel(
       id: UUID(), startedAtWall: Date(), accumulatedActive: 60, state: state,
-      batteryLevelAtStart: nil, batteryLevel: nil, checkpointAtWall: Date())
+      batteryLevelAtStart: nil, batteryLevel: nil, checkpointAtWall: Date(),
+      distanceMeters: distanceMeters, splits: splits)
   }
 
   @Test
