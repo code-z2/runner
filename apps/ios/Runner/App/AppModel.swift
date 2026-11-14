@@ -32,6 +32,8 @@ final class AppModel {
 
   let goals: GoalService?
 
+  let community: CommunityService?
+
   let near: NearStack
 
   let healthKit: LiveHealthKitStore
@@ -108,13 +110,19 @@ final class AppModel {
       let deployment = EscrowDeployment.mainnet
       let account = GoalAccount(
         gateway: gateway, core: core, rpc: mainnet, keychain: keychain, deployment: deployment)
-      goals = GoalService(
-        account: account, gateway: gateway,
-        intents: ProxiedIntentClient(baseURL: workerURL) { try await account.assert($0) },
+      let intents = ProxiedIntentClient(baseURL: workerURL) { try await account.assert($0) }
+      let evidence = GoalEvidence(keychain: keychain)
+      let goalService = GoalService(
+        account: account, gateway: gateway, intents: intents,
         escrow: LiveEscrowService(rpc: mainnet, submitter: account, deployment: deployment),
-        deployment: deployment, evidence: GoalEvidence(keychain: keychain))
+        deployment: deployment, evidence: evidence)
+      goals = goalService
+      community = CommunityService(
+        goals: goalService, account: account, gateway: gateway, intents: intents, rpc: mainnet,
+        evidence: evidence, deployment: deployment, dao: "ije-v1.sputnik-dao.near")
     } else {
       goals = nil
+      community = nil
     }
     let network = NearNetwork.testnet(relayerURL: AppConstants.nearRelayURL)
     // RPC is optional: a bad URL degrades wallet/auth resolution to an
