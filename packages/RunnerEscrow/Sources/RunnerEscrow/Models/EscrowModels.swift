@@ -74,6 +74,29 @@ public struct EscrowGoal: Sendable, Equatable, Codable {
     return String(decoding: try encoder.encode(self), as: UTF8.self)
   }
 
+  /// `msg` for a deposit delivered on the owner's behalf (1Click solver):
+  /// the deployed `DepositMsg { owner, goal, funding_id }`. The contract
+  /// logs `goal_funded` with `funding_id` when the lock is created.
+  public func depositMessage(owner: String, fundingID: UUID) throws -> String {
+    try validated()
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    let message = DepositMessage(
+      owner: owner, goal: self, fundingID: fundingID.uuidString.lowercased())
+    return String(decoding: try encoder.encode(message), as: UTF8.self)
+  }
+
+  private struct DepositMessage: Encodable {
+    let owner: String
+    let goal: EscrowGoal
+    let fundingID: String
+
+    private enum CodingKeys: String, CodingKey {
+      case owner, goal
+      case fundingID = "funding_id"
+    }
+  }
+
   /// Client-side pre-check mirroring the contract's `goal_is_met`: distance
   /// covered, and average pace inside the cap when the goal is timed.
   /// Advisory only — the contract decides.
@@ -120,11 +143,25 @@ public struct EscrowLock: Sendable, Equatable, Decodable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(UInt64.self, forKey: .id)
+    id = try EscrowLock.decodeU64(container, forKey: .id)
     ownerID = try container.decode(String.self, forKey: .ownerID)
     amount = try EscrowLock.decodeU128(container, forKey: .amount)
     goal = try container.decode(EscrowGoal.self, forKey: .goal)
-    createdAt = try container.decode(UInt64.self, forKey: .createdAt)
+    createdAt = try EscrowLock.decodeU64(container, forKey: .createdAt)
+  }
+
+  /// near `U64` serializes as a JSON string; tolerate a bare number too.
+  static func decodeU64<Key: CodingKey>(_ container: KeyedDecodingContainer<Key>, forKey key: Key)
+    throws -> UInt64
+  {
+    if let string = try? container.decode(String.self, forKey: key) {
+      guard let value = UInt64(string) else {
+        throw DecodingError.dataCorruptedError(
+          forKey: key, in: container, debugDescription: "not a u64: \(string)")
+      }
+      return value
+    }
+    return try container.decode(UInt64.self, forKey: key)
   }
 
   /// near `U128` serializes as a JSON string; tolerate a bare number too.
@@ -234,6 +271,13 @@ public struct EscrowDeployment: Sendable, Equatable {
     self.token = token
     self.treasury = treasury
   }
+
+  /// v1 mainnet, matching `apps/api/wrangler.toml`.
+  public static let mainnet = EscrowDeployment(
+    escrow: "ije-v1-escrow.codez2.near",
+    token: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+    treasury: "ije-v1-claims.codez2.near"
+  )
 
   public static let placeholder = EscrowDeployment(
     escrow: "escrow.example.invalid",
