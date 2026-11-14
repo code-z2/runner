@@ -1048,3 +1048,154 @@ Living record of what was built. Update on every completed item.
   empty so no payouts run until funded; escrow works standalone
 - Metadata: apps/api/wrangler.toml, apps/api/package.json,
   apps/api/scripts/dao-policy.mainnet.json; 2026-11-13
+
+### Goals UI
+
+- Goals replaces the Wallet entry with an empty state, an unbeaten goal
+  card, and completed goals with funds ready to move. Only an unbeaten
+  goal blocks creation of another goal.
+- Lock a goal uses the shared Home distance wheel and a native numeric
+  input for custom amounts. Funding carries the selected goal into the
+  chain selector and sample NEAR Intents quote.
+- The sample action exercises the locked state for the current app
+  session. Previews cover empty, unbeaten and beaten goals. No NEAR
+  calls or deposits are made.
+
+- The Goals action and floating tab bar share one bottom inset in Home.
+  Stacking them there keeps the full button visible and tappable.
+
+- Goals previews cover unlocked funds with and without an unbeaten goal.
+  A Withdraw button belongs to each unlocked goal and displays its return
+  chain and address before tapping. Preview withdrawal only changes
+  sample state. Returning to a non-NEAR funding chain needs a separate
+  outbound route when escrow is connected.
+
+- The funding quote requires a return address entered through a native
+  text prompt for the selected network. The shortened address reopens the
+  prompt when tapped. Done remembers the return address per network on
+  the device for the next funding flow. Lock goal opens a medium deposit sheet with
+  the large amount, separate network label, copyable sample address, and
+  a short exchange note. The header has extra top padding. Done closes
+  the sheet and advances to the sample locked goal.
+
+- Goals uses the shared funding quote card and deposit sheet. Each
+  feature supplies its labels, amounts, address, and actions so Community
+  can reuse the views with a different recipient.
+
+### Recorded kilometer splits
+
+- Live runs estimate each completed kilometer crossing between consecutive
+  location fixes on the active workout clock. Paused time is excluded.
+- Split durations travel with workout checkpoints and saved run records.
+  The immediate summary and History read the same durations. Earlier
+  records migrate with empty splits because they only contain totals.
+
+### Goals loading skeleton
+
+- While Goals loads for the first time, a placeholder goal card shows grey
+  bars for the eyebrow, amount, target and footnote. It replaces the
+  "Loading goals" spinner. It uses SwiftUI's placeholder redaction on the
+  card's own layout and pulses unless Reduce Motion is on. VoiceOver reads
+  it as "Loading goals". A refresh after the first load keeps the last
+  goals on screen instead of showing the skeleton again.
+- The Goals column fills the screen width in every state. Before, the
+  unavailable and loading states had no full-width card, so the page
+  shrank to its text and showed white strips at the sides.
+- Previews now cover Loading and Unavailable.
+
+### Goal attempts and unlock status on the goal card
+
+- The "On a goal" card shows the best run on this device since the goal
+  locked ("Best try: 1.02 km in 14:32"). The progress bar fills by
+  distance covered, then by the time limit scaled to that distance; a
+  full bar means the goal is met.
+- Every Goals refresh, including pull to refresh and opening the page,
+  lists the goals, then checks a saved run against the locked goal with
+  the Worker only (a run proof, no chain transaction). A proven goal shows
+  as "Ready to withdraw"; otherwise the reason shows under the best try. The outcome is one of: the last run can't count (the run check's
+  reason, for example missing kilometre splits), no recent run beats the
+  goal, or the run wasn't verified (Motion & Fitness off, cadence outside
+  the limit, or the Worker's eligibility code).
+- Withdraw does all the chain work, one contract call per stage, and each
+  stage first checks the chain so a repeat tap resumes where it stopped:
+  `unlock` with the cached proof only while the lock is in `get_locks`
+  (seeding first, idempotent); reserve the payout (the Worker returns the
+  same reservation); `withdraw` only while `get_balance` still covers the
+  amount. Each call is atomic on chain, and a failed USDC transfer is
+  re-credited by the escrow callback.
+- The Withdraw button names the stage it is on: "Requesting withdrawal"
+  (unlock), "Reserving payout", then "Processing deposit" (escrow
+  `withdraw`), and refreshes when done. Leaving mid-way is safe: the next
+  tap resumes at the unfinished stage. While 1Click delivers a payout, the
+  Goals page refreshes every 15 seconds until the goal ends and leaves.
+- RunnerEscrow decodes the deployed `get_locks` shape, where `id` and
+  `created_at` are U64 strings.
+- The run check gives a reason instead of silently dropping a run, and the
+  latest rejection is kept so a later refresh can show it.
+
+## 2026-11-14 - Goal escrow wiring
+
+- What it is: the non-UI wiring behind Goals. One 1Click client, one thin
+  Worker proxy, one saved quote per goal, withdrawal from the goal ID, and
+  RunnerEscrow restored as the escrow seam.
+- How it was done:
+  - RunnerNear builds and decodes 1Click quotes with the pinned SDK's
+    `oneclick` v0 models, which carry `customRecipientMsg` and
+    `depositMemo`. `ProxiedIntentClient` posts the SDK bytes to
+    `/v1/intents/*` with an App Attest assertion over
+    `METHOD /v1/intents<path> <sha256(body)>`. Goals and Community share it.
+  - The Worker proxy checks App Attest and a route allowlist (`POST
+    /v0/quote`, `GET /v0/tokens`, `GET /v0/status`). It adds the 1Click key
+    and returns the upstream status and body.
+  - A payable quote whose recipient is the escrow is a goal quote. It must
+    be `EXACT_OUTPUT` into escrow USDC, and its msg must be the deployed
+    `DepositMsg { owner, goal, funding_id }`.
+  - D1 keeps one row per goal ID. Concurrent requests share the first
+    upstream quote. An identical retry gets the saved body back, even if
+    the deadline moved. A different request for the same ID returns 409.
+    The return address is not unique, so a runner can reuse it.
+  - Done closes the deposit sheet. `/v1/goals/list` links a goal to an
+    escrow lock from `get_locks` only once 1Click reports SUCCESS for that
+    goal's deposit address. The lock must also match the goal, the quoted
+    amount, and be created after the quote. An abandoned quote with the
+    same goal therefore never takes the paid goal's lock. Only locked
+    goals are returned; nothing shows while a deposit is pending.
+  - The deployed `goal_funded` event is not read. It costs no contract
+    storage (logs live in receipt outcomes), so it stays as an on-chain
+    record of `funding_id` to lock.
+  - `/v1/goals/withdraw` takes the goal ID. It requires the lock to be gone
+    and the escrow balance to cover the locked amount, which is what
+    actually landed (no fee). It then reserves one 1Click payout back to
+    the saved return address on the original chain and registers USDC
+    storage for the payout account. The app signs escrow `withdraw`
+    through RunnerEscrow and relays it on `/v1/relay`.
+  - A goal ends when 1Click reports SUCCESS for its payout: the list drops
+    it and keeps no history on screen, so the runner can lock a new goal. Before that, the escrow balance decides: still holding
+    the amount means `ready_to_withdraw` (resume), already sent means
+    `withdrawing`, so a settled goal never falls back to withdrawable while
+    1Click picks up the deposit. The Goals page shows
+    "Withdrawn".
+  - iOS splits the old GoalService into `GoalAccount` (implicit key, App
+    Attest, NEP-413 signing, delegate relay as `EscrowSubmitter`),
+    `GoalService` (list, quote, withdraw, attest, unlock) and
+    `GoalEvidence` (run candidates and proof cache, moved unchanged).
+- Why this way: these are exactly the five requested behaviours. The
+  previous pass had two transports, a separate fund route, a ticket table,
+  archival transaction lookups and a 409 for concurrent quotes; all removed.
+  Goal state is read from the chain (locks, balance) and 1Click status
+  instead of tracked transaction rows.
+- Importance: the only paths that move user funds are now small enough to
+  review in full.
+- Metadata:
+  - Worker goal code is 377 lines, previously 884.
+  - Migration 0005 drops the empty 0004 goal tables (0004 is applied on
+    mainnet D1; 0005 is not applied yet).
+  - The escrow source in this tree builds byte-identical to the deployed
+    `ije-v1-escrow.codez2.near` (code hash
+    HAWyNfaRsXVdbzn9tpYBqqiC4XksbTmcWpNNkFNoh4Wg).
+  - NEAR RPC is `rpc.mainnet.fastnear.com` for the Worker and the app;
+    `rpc.mainnet.near.org` returned HTTP 429 to the Worker's shared
+    Cloudflare egress, which surfaced as "Goal status is unavailable".
+  - Tests: Worker 79, RunnerNear Rust 17 and Swift 43, RunnerEscrow 19,
+    RunnerGateway 17, app 41.
+  - Not exercised on a device or with real funds.
